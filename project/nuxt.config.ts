@@ -41,7 +41,7 @@ export default defineNuxtConfig({
               normalizePath(
                 path.resolve(
                   __dirname,
-                  "./node_modules/lean4monaco/node_modules/@leanprover/infoview/dist/*"
+                  "./node_modules/lean4monaco/dist/lean4-infoview/*"
                 )
               ),
               normalizePath(
@@ -58,7 +58,7 @@ export default defineNuxtConfig({
               normalizePath(
                 path.resolve(
                   __dirname,
-                  "./node_modules/lean4monaco/node_modules/@leanprover/infoview/dist/codicon.ttf"
+                  "./node_modules/lean4monaco/dist/lean4-infoview/codicon.ttf"
                 )
               ),
             ],
