@@ -1,4 +1,3 @@
-<script setup lang="ts">
 export const useLean4Monaco = () => {
   const editorInstance = ref<any>(null)
   const leanMonacoInstance = ref<any>(null)
@@ -100,4 +99,4 @@ export const useLean4Monaco = () => {
     dispose
   }
 }
-</script>
+
