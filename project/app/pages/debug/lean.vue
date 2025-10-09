@@ -75,6 +75,10 @@ const runTests = async () => {
       <UButton to="/editor" color="success" variant="outline">
         Go to Lean Editor
       </UButton>
+      
+      <UButton to="/lean4monaco-test" color="primary" variant="outline">
+        Go to Lean4Monaco Test
+      </UButton>
     </div>
   </div>
 </template>
