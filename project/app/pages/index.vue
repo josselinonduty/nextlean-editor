@@ -152,5 +152,25 @@ useSeoMeta({
         </div>
       </div>
     </div>
+
+    <div class="max-w-4xl mx-auto mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
+      <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 text-center">
+        Developer Tools
+      </h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <NuxtLink to="/editor-ws">
+          <UButton variant="outline" block icon="tabler:plug">
+            WebSocket-Enabled Editor
+          </UButton>
+        </NuxtLink>
+        
+        <NuxtLink to="/debug/websocket">
+          <UButton variant="outline" block icon="tabler:bug">
+            WebSocket Connection Test
+          </UButton>
+        </NuxtLink>
+      </div>
+    </div>
   </div>
 </template>
