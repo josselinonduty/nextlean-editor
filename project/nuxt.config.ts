@@ -36,6 +36,34 @@ export default defineNuxtConfig({
             ),
             dest: "monaco-editor/min/vs",
           },
+          {
+            src: [
+              normalizePath(
+                path.resolve(
+                  __dirname,
+                  "./node_modules/lean4monaco/node_modules/@leanprover/infoview/dist/*"
+                )
+              ),
+              normalizePath(
+                path.resolve(
+                  __dirname,
+                  "./node_modules/lean4monaco/dist/webview/webview.js"
+                )
+              ),
+            ],
+            dest: "infoview",
+          },
+          {
+            src: [
+              normalizePath(
+                path.resolve(
+                  __dirname,
+                  "./node_modules/lean4monaco/node_modules/@leanprover/infoview/dist/codicon.ttf"
+                )
+              ),
+            ],
+            dest: "assets",
+          },
         ],
       }),
     ],
