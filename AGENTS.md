@@ -31,6 +31,6 @@ Follow Nuxt v4 guidelines:
 
 Use `tabler:$icon` for icons.
 
-Never add comments UNLESS I explicitly ask for it.
+NEVER add comments UNLESS I explicitly ask for it. No "//", "/_ ... _/", or "<!-- ... -->" comments.
 
 Always put `<script setup lang="ts">` at the top of the file, even before `<template>`, and even if there is no script code.

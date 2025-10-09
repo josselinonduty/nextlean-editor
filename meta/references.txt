@@ -1,4 +1,0 @@
-Notion: https://www.notion.so/asgardn/Formal-Proof-Lean-2632b2aadca380fdb57bce84319583ba
-
-Lean (officiel): https://lean-lang.org/
-

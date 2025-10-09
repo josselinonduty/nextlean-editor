@@ -9,17 +9,11 @@ const sidebarCollapsed = ref(false)
 const route = useRoute()
 const pageTitle = computed(() => {
   // Try to get title from various sources
-  return route.meta?.title || 'NextLean'
+  return (route.meta?.title as string) || 'NextLean'
 })
 
 // Navigation items for the main menu
 const navigationItems: NavigationMenuItem[][] = [[
-  {
-    label: 'Home',
-    icon: 'tabler:home',
-    to: '/',
-    active: route.path === '/'
-  },
   {
     label: 'Lean Editor',
     icon: 'tabler:code',
@@ -50,22 +44,6 @@ const footerItems: NavigationMenuItem[][] = [[
     to: '/help'
   }
 ]]
-
-// Keyboard shortcut to toggle sidebar (Meta + K)
-onMounted(() => {
-  const handleKeydown = (event: KeyboardEvent) => {
-    if (event.metaKey && event.key === 'k') {
-      event.preventDefault()
-      sidebarCollapsed.value = !sidebarCollapsed.value
-    }
-  }
-  
-  document.addEventListener('keydown', handleKeydown)
-  
-  onUnmounted(() => {
-    document.removeEventListener('keydown', handleKeydown)
-  })
-})
 </script>
 
 <template>
@@ -89,23 +67,6 @@ onMounted(() => {
       </template>
 
       <template #default="{ collapsed }">
-        <!-- Search Button -->
-        <UButton
-          :label="collapsed ? undefined : 'Search...'"
-          icon="tabler:search"
-          color="neutral"
-          variant="outline"
-          block
-          :square="collapsed"
-        >
-          <template v-if="!collapsed" #trailing>
-            <div class="flex items-center gap-0.5 ms-auto">
-              <UKbd value="meta" variant="subtle" />
-              <UKbd value="K" variant="subtle" />
-            </div>
-          </template>
-        </UButton>
-
         <!-- Navigation Menu -->
         <UNavigationMenu
           :collapsed="collapsed"
@@ -125,12 +86,12 @@ onMounted(() => {
     </UDashboardSidebar>
 
     <!-- Main Content Panel -->
-    <UDashboardPanel>
+    <UDashboardPanel grow>
       <!-- Top Bar -->
       <template #header>
         <UDashboardNavbar :title="pageTitle">
           <template #left>
-            <UDashboardSidebarToggle />
+            <UDashboardSidebarCollapse side="left" />
           </template>
         </UDashboardNavbar>
       </template>
@@ -142,3 +103,23 @@ onMounted(() => {
     </UDashboardPanel>
   </UDashboardGroup>
 </template>
+
+<style scoped>
+/* Ensure proper sidebar collapse widths for left sidebar */
+:deep(.group[data-collapsed="true"]) {
+  min-width: 60px !important;
+  max-width: 60px !important;
+}
+
+/* Main panel should be flexible */
+:deep(.dashboard-panel) {
+  flex: 1;
+  min-width: 0;
+  width: auto !important;
+}
+
+/* Smooth transitions for all panels */
+:deep(.group) {
+  transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out, max-width 0.3s ease-in-out;
+}
+</style>
