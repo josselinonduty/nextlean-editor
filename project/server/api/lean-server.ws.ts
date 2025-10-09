@@ -14,43 +14,12 @@ export default defineWebSocketHandler({
     const sessionId = createLeanServerSession();
     peer.sessionId = sessionId;
 
-    const leanProcess = startLeanServer(sessionId);
-
-    if (!leanProcess) {
-      peer.send(
-        JSON.stringify({
-          type: "error",
-          data: { message: "Failed to start Lean server" },
-        })
-      );
-      peer.close();
-      return;
-    }
-
     peer.send(
       JSON.stringify({
         type: "session",
         data: { sessionId, status: "connected" },
       })
     );
-
-    leanProcess.stdout?.on("data", (data) => {
-      try {
-        const message = data.toString();
-        peer.send(
-          JSON.stringify({
-            type: "rpc",
-            data: message,
-          })
-        );
-      } catch (error) {
-        console.error("Error sending data to client:", error);
-      }
-    });
-
-    leanProcess.stderr?.on("data", (data) => {
-      console.error(`Lean server stderr for session ${sessionId}:`, data.toString());
-    });
   },
 
   message(peer, message) {
@@ -61,21 +30,72 @@ export default defineWebSocketHandler({
 
     updateSessionActivity(peer.sessionId);
 
-    const session = getLeanServerSession(peer.sessionId);
-    if (!session || !session.process) {
+    let session = getLeanServerSession(peer.sessionId);
+    if (!session) {
       peer.send(
         JSON.stringify({
           type: "error",
-          data: { message: "Session not found or Lean server not running" },
+          data: { message: "Session not found" },
         })
       );
       return;
     }
 
+    if (!session.process || !session.pid) {
+      console.log(`Starting Lean server for session ${peer.sessionId}`);
+      const leanProcess = startLeanServer(peer.sessionId);
+
+      if (!leanProcess) {
+        peer.send(
+          JSON.stringify({
+            type: "error",
+            data: { message: "Failed to start Lean server. Is Lean 4 installed?" },
+          })
+        );
+        return;
+      }
+
+      session = getLeanServerSession(peer.sessionId);
+      if (!session) {
+        peer.send(
+          JSON.stringify({
+            type: "error",
+            data: { message: "Session lost after starting Lean server" },
+          })
+        );
+        return;
+      }
+
+      leanProcess.stdout?.on("data", (data) => {
+        try {
+          const message = data.toString();
+          peer.send(
+            JSON.stringify({
+              type: "rpc",
+              data: message,
+            })
+          );
+        } catch (error) {
+          console.error("Error sending data to client:", error);
+        }
+      });
+
+      leanProcess.stderr?.on("data", (data) => {
+        console.error(`Lean server stderr for session ${peer.sessionId}:`, data.toString());
+      });
+
+      peer.send(
+        JSON.stringify({
+          type: "status",
+          data: { message: "Lean server started" },
+        })
+      );
+    }
+
     try {
       const messageStr = typeof message === "string" ? message : message.text();
 
-      if (session.process.stdin) {
+      if (session.process && session.process.stdin) {
         session.process.stdin.write(messageStr + "\n");
       }
     } catch (error) {

@@ -42,6 +42,8 @@ export const useLeanWebSocket = () => {
                 messageHandlers.delete(rpcData.id);
               }
             }
+          } else if (message.type === "status") {
+            console.log("Status update:", message.data);
           } else if (message.type === "error") {
             console.error("Server error:", message.data);
             error.value = message.data.message || "Unknown error";
