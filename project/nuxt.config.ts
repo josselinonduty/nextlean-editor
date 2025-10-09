@@ -13,6 +13,12 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   ssr: false,
 
+  nitro: {
+    experimental: {
+      websocket: true,
+    },
+  },
+
   alias: {
     "@server": new URL("./server", import.meta.url).pathname,
     "#server": new URL("./server", import.meta.url).pathname,

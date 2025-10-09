@@ -52,3 +52,34 @@ export interface LeanAnalysis {
   isHovering: boolean;
   hasContent: boolean;
 }
+
+export interface LeanServerSession {
+  id: string;
+  projectPath: string;
+  pid?: number;
+  createdAt: Date;
+  lastActivity: Date;
+}
+
+export interface WebSocketMessage {
+  type: "rpc" | "session" | "error" | "status";
+  data: any;
+}
+
+export interface LeanRPCRequest {
+  jsonrpc: "2.0";
+  id?: number | string;
+  method: string;
+  params?: any;
+}
+
+export interface LeanRPCResponse {
+  jsonrpc: "2.0";
+  id?: number | string;
+  result?: any;
+  error?: {
+    code: number;
+    message: string;
+    data?: any;
+  };
+}
