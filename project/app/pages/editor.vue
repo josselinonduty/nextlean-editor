@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import type { Diagnostic } from '#shared/types/lsp'
+import type { SavedProof } from '#shared/types'
 
 useSeoMeta({
   title: 'Lean Editor - NextLean'
 })
+
+const route = useRoute()
+const toast = useToast()
+const { proofs, loading: proofsLoading, error: proofsError, fetchProofs, getProof, createProof, updateProof } = useProofs()
+
 
 const editorContainer = ref<HTMLElement>()
 const mainContainer = ref<HTMLElement>()
@@ -32,6 +38,48 @@ const isResizing = ref(false)
 const documentVersion = ref(1)
 const documentUri = ref('file:///workspace/main.lean')
 const isDocumentOpen = ref(false)
+
+const showSavePanel = ref(false)
+const proofTitle = ref('')
+const proofTags = ref<string[]>([])
+const isSaving = ref(false)
+const currentProofId = ref<string | null>(null)
+const selectedProofForUpdate = ref<string | null>(null)
+const hasLoadedProofs = ref(false)
+const proofSearch = ref('')
+const filteredLibraryProofs = computed(() => {
+  const term = proofSearch.value.trim().toLowerCase()
+  if (!term) {
+    return proofs.value
+  }
+  return proofs.value.filter((proof) => {
+    const titleMatch = proof.title.toLowerCase().includes(term)
+    const tagMatch = proof.tags.some(tag => tag.toLowerCase().includes(term))
+    return titleMatch || tagMatch
+  })
+})
+const isUpdateMode = computed(() => selectedProofForUpdate.value !== null)
+
+const ensureProofsLoaded = async () => {
+  if (hasLoadedProofs.value) return
+  await fetchProofs()
+  if (!proofsError.value) {
+    hasLoadedProofs.value = true
+  }
+}
+
+const handleOpenSavePanel = async () => {
+  await ensureProofsLoaded()
+  if (currentProofId.value && !selectedProofForUpdate.value) {
+    const existing = proofs.value.find(proof => proof.id === currentProofId.value)
+    if (existing) {
+      proofTitle.value = existing.title
+      proofTags.value = [...existing.tags]
+      selectedProofForUpdate.value = existing.id
+    }
+  }
+  showSavePanel.value = true
+}
 
 const leanDiagnostics = ref<Diagnostic[]>([])
 const leanGoals = ref<string | null>(null)
@@ -200,6 +248,11 @@ onMounted(async () => {
     
     leanLsp.setupDiagnosticsListener()
     leanLsp.connect()
+
+    await nextTick()
+    await loadProofFromDatabase()
+
+    await ensureProofsLoaded()
     
   } catch (error) {
     console.error('Failed to initialize editor:', error)
@@ -444,6 +497,177 @@ const saveFile = () => {
   isModified.value = false
 }
 
+const saveProofToDatabase = async () => {
+  if (!proofTitle.value.trim()) {
+    toast.add({
+      title: 'Missing title',
+      description: 'Please provide a descriptive proof title before saving.',
+      color: 'warning'
+    })
+    return
+  }
+
+  isSaving.value = true
+  try {
+    const content = editorInstance?.getValue() || code.value
+    const payloadTags = proofTags.value
+
+    const wasUpdate = isUpdateMode.value && currentProofId.value !== null
+
+    const result = currentProofId.value && wasUpdate
+      ? await updateProof(currentProofId.value, {
+          title: proofTitle.value,
+          content,
+          tags: payloadTags
+        })
+      : await createProof({
+          title: proofTitle.value,
+          content,
+          tags: payloadTags
+        })
+
+    if (result) {
+      currentProofId.value = result.id
+      selectedProofForUpdate.value = result.id
+      proofTitle.value = result.title
+      proofTags.value = [...result.tags]
+      isModified.value = false
+      showSavePanel.value = false
+      toast.add({
+        title: wasUpdate ? 'Proof updated' : 'Proof saved',
+        description: 'Your proof is available in the library tab.',
+        color: 'success'
+      })
+      hasLoadedProofs.value = true
+    }
+  } catch (error) {
+    console.error('Failed to save proof:', error)
+    toast.add({
+      title: 'Save failed',
+      description: 'An error occurred while saving the proof. Please try again.',
+      color: 'error'
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const resetSaveState = () => {
+  proofTitle.value = ''
+  proofTags.value = []
+  selectedProofForUpdate.value = null
+}
+
+const prepareUpdate = async (proof: SavedProof) => {
+  await ensureProofsLoaded()
+  currentProofId.value = proof.id
+  proofTitle.value = proof.title
+  proofTags.value = [...proof.tags]
+  selectedProofForUpdate.value = proof.id
+  showSavePanel.value = true
+}
+
+const prepareCreate = async () => {
+  await ensureProofsLoaded()
+  resetSaveState()
+  currentProofId.value = null
+  showSavePanel.value = true
+}
+
+const loadProofIntoEditor = (proof: SavedProof) => {
+  if (editorInstance) {
+    editorInstance.setValue(proof.content)
+  }
+  code.value = proof.content
+  currentProofId.value = proof.id
+  proofTitle.value = proof.title
+  proofTags.value = [...proof.tags]
+  selectedProofForUpdate.value = proof.id
+  isModified.value = false
+  toast.add({
+    title: 'Proof loaded',
+    description: 'You can continue editing this proof.',
+    color: 'info'
+  })
+  showSavePanel.value = false
+}
+
+const formatProofTimestamp = (timestamp: number) => {
+  return new Date(timestamp).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const copyProofContent = async (proof: SavedProof) => {
+  if (typeof navigator === 'undefined' || !navigator.clipboard) {
+    toast.add({
+      title: 'Copy unavailable',
+      description: 'Clipboard is not available in this environment.',
+      color: 'warning'
+    })
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(proof.content)
+    toast.add({
+      title: 'Copied content',
+      description: 'Proof content copied to clipboard.',
+      color: 'success'
+    })
+  } catch (error) {
+    console.error('Failed to copy proof content:', error)
+    toast.add({
+      title: 'Copy failed',
+      description: 'Unable to copy proof content.',
+      color: 'error'
+    })
+  }
+}
+
+const loadProofFromDatabase = async () => {
+  const proofId = route.query.proofId as string | undefined
+  const encodedContent = route.query.content as string | undefined
+
+  if (encodedContent) {
+    const decoded = decodeURIComponent(encodedContent)
+    if (editorInstance) {
+      editorInstance.setValue(decoded)
+    }
+    code.value = decoded
+    currentProofId.value = proofId || null
+    isModified.value = false
+    await navigateTo('/editor', { replace: true })
+    return
+  }
+
+  if (proofId) {
+    try {
+      const proof = await getProof(proofId)
+      if (proof) {
+        loadProofIntoEditor(proof)
+        proofTitle.value = proof.title
+        proofTags.value = [...proof.tags]
+        currentProofId.value = proof.id
+        selectedProofForUpdate.value = proof.id
+      }
+    } catch (error) {
+      console.error('Failed to load proof from server:', error)
+      toast.add({
+        title: 'Unable to load proof',
+        description: 'The requested proof could not be loaded from the server.',
+        color: 'error'
+      })
+    } finally {
+      await navigateTo('/editor', { replace: true })
+    }
+  }
+}
+
 const toggleTheme = async () => {
   theme.value = theme.value === 'vs-dark' ? 'vs-light' : 'vs-dark'
   if (editorInstance) {
@@ -522,6 +746,22 @@ watch(showInfoview, () => {
       }, 100)
     }
   })
+})
+
+watch(showSavePanel, async (open) => {
+  if (open) {
+    await ensureProofsLoaded()
+  }
+})
+
+watch(() => proofsError.value, (message) => {
+  if (message) {
+    toast.add({
+      title: 'Proof library error',
+      description: message,
+      color: 'error'
+    })
+  }
 })
 </script>
 
@@ -622,6 +862,15 @@ watch(showInfoview, () => {
           :disabled="!isModified"
           title="Save File"
         />
+
+        <UButton 
+          icon="tabler:cloud-upload" 
+          size="sm" 
+          color="info"
+          :loading="isSaving || proofsLoading"
+          title="Save or manage proofs"
+          @click="handleOpenSavePanel"
+        />
         
         <div class="h-6 w-px bg-gray-300 dark:bg-gray-700"></div>
         
@@ -721,17 +970,6 @@ watch(showInfoview, () => {
                   <UAccordion
                     :items="[
                       {
-                        label: 'Goals',
-                        icon: 'tabler:target',
-                        defaultOpen: true,
-                        slot: 'goals'
-                      },
-                      {
-                        label: 'Hover Info',
-                        icon: 'tabler:info-circle',
-                        slot: 'hover'
-                      },
-                      {
                         label: 'Diagnostics',
                         icon: 'tabler:alert-circle',
                         badge: leanDiagnostics.length > 0 ? leanDiagnostics.length : undefined,
@@ -744,37 +982,19 @@ watch(showInfoview, () => {
                         slot: 'errors'
                       }
                     ].filter(item => item.slot !== 'errors' || leanErrors.length > 0)"
-                    multiple
+                    type="multiple"
+                    :default-value="['0']"
                   >
-                    <template #goals>
-                      <div v-if="leanGoals" class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg font-mono text-xs whitespace-pre-wrap">
-                        {{ leanGoals }}
-                      </div>
-                      <div v-else class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs text-gray-500">
-                        No goals
-                      </div>
-                    </template>
-
-                    <template #hover>
-                      <div v-if="leanHoverInfo" class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg font-mono text-xs whitespace-pre-wrap">
-                        {{ leanHoverInfo }}
-                      </div>
-                      <div v-else class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs text-gray-500">
-                        No hover information
-                      </div>
-                    </template>
-
                     <template #diagnostics>
                       <div v-if="leanDiagnostics.length > 0" class="space-y-2">
                         <div 
                           v-for="(diag, idx) in leanDiagnostics" 
                           :key="idx"
-                          class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-xs"
+                          class="p-3 bg-info-50 dark:bg-info-900/20 rounded-lg text-xs"
                         >
                           <div class="flex items-start gap-2">
-                            <UIcon name="tabler:alert-triangle" class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                             <div class="flex-1 wrap-normal">
-                              <div class="font-mono text-red-700 dark:text-red-400 mb-1">
+                              <div class="font-mono text-info-700 dark:text-info-400 mb-1">
                                 Line {{ diag.range.start.line + 1 }}:{{ diag.range.start.character + 1 }}
                               </div>
                               <div class="text-gray-900 dark:text-gray-100 wrap-anywhere">
@@ -855,6 +1075,134 @@ watch(showInfoview, () => {
       </div>
     </div>
     
+    <USlideover
+      v-model:open="showSavePanel"
+      title="Proof Library"
+      side="right"
+      :ui="{ content: 'max-w-lg w-full bg-white dark:bg-gray-950' }"
+    >
+      <template #content="{ close }">
+        <div class="flex flex-col h-full">
+          <div class="px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-800">
+            <div class="flex items-start justify-between gap-3">
+              <div class="space-y-1">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Proof Library</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Save your current proof or continue from saved work.</p>
+              </div>
+              <UBadge :color="isUpdateMode ? 'info' : 'primary'" variant="soft">
+                {{ isUpdateMode ? 'Update mode' : 'New proof' }}
+              </UBadge>
+            </div>
+          </div>
+
+          <div class="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">Save current proof</h3>
+                <div class="flex items-center gap-2">
+                  <UBadge v-if="selectedProofForUpdate" variant="subtle" color="neutral" size="xs">
+                    ID {{ selectedProofForUpdate.slice(0, 8) }}
+                  </UBadge>
+                  <UButton size="xs" variant="ghost" color="neutral" icon="tabler:plus" @click="prepareCreate">New entry</UButton>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <UFormField label="Title" :ui="{ label: { base: 'text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wide' } }">
+                  <UInput v-model="proofTitle" placeholder="Give your proof a clear title" :disabled="isSaving" />
+                </UFormField>
+
+                <UFormField label="Tags" :ui="{ label: { base: 'text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wide' } }">
+                  <UInputTags
+                    v-model="proofTags"
+                    placeholder="Add tags and press enter"
+                    :disabled="isSaving"
+                    :add-on-blur="true"
+                    :add-on-paste="true"
+                    :duplicate="false"
+                  />
+                </UFormField>
+              </div>
+
+              <UButton color="info" :loading="isSaving" @click="saveProofToDatabase" size="md">
+                {{ isUpdateMode ? 'Update proof' : 'Save proof' }}
+              </UButton>
+            </div>
+
+            <div class="space-y-4 border-t border-gray-200 dark:border-gray-800 pt-6">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">Stored proofs</h3>
+                <UButton size="xs" variant="ghost" color="neutral" icon="tabler:refresh" :loading="proofsLoading" @click="fetchProofs">Refresh</UButton>
+              </div>
+
+              <UInput
+                v-model="proofSearch"
+                icon="tabler:search"
+                placeholder="Search by title or tag"
+                :ui="{ base: 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800' }"
+              />
+
+              <div v-if="proofsError" class="text-sm text-error-600 dark:text-error-400 bg-error-50/80 dark:bg-error-900/30 border border-error-200 dark:border-error-800 rounded-lg p-4">
+                {{ proofsError }}
+              </div>
+
+              <div v-if="proofsLoading" class="flex items-center justify-center py-12 text-gray-500 dark:text-gray-400">
+                <UIcon name="tabler:loader-2" class="w-6 h-6 animate-spin" />
+              </div>
+
+              <div v-else-if="filteredLibraryProofs.length === 0" class="text-sm text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center">
+                {{ proofs.length === 0 ? 'No proofs saved yet. Save your first proof using the form above.' : 'No proofs match your search.' }}
+              </div>
+
+              <div v-else class="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                <div
+                  v-for="proof in filteredLibraryProofs"
+                  :key="proof.id"
+                  :class="[
+                    'rounded-lg p-4 bg-white dark:bg-gray-900 border transition-all cursor-pointer space-y-3',
+                    selectedProofForUpdate === proof.id ? 'border-info-500 dark:border-info-400' : 'border-gray-200 dark:border-gray-800 hover:border-info-400/50'
+                  ]"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="space-y-1">
+                      <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ proof.title }}</h4>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">Updated {{ formatProofTimestamp(proof.updatedAt) }}</p>
+                    </div>
+                    <UButton size="xs" variant="ghost" color="info" icon="tabler:edit" @click="prepareUpdate(proof)">Edit</UButton>
+                  </div>
+
+                  <div v-if="proof.tags.length" class="flex flex-wrap gap-2">
+                    <UBadge v-for="tag in proof.tags" :key="tag" variant="soft" color="info" size="xs" class="lowercase">{{ tag }}</UBadge>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <UButton
+                      size="xs"
+                      color="info"
+                      variant="soft"
+                      icon="tabler:arrow-forward-up"
+                      @click="loadProofIntoEditor(proof); close()"
+                    >
+                      Load in editor
+                    </UButton>
+                    <UButton
+                      size="xs"
+                      variant="ghost"
+                      color="neutral"
+                      icon="tabler:clipboard"
+                      @click="copyProofContent(proof)"
+                    >
+                      Copy
+                    </UButton>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </USlideover>
+
     <div class="border-t border-gray-200 dark:border-gray-800 px-3 py-2 bg-gray-50 dark:bg-gray-900 flex items-center justify-between text-sm">
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-3">

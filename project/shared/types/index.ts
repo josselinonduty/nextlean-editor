@@ -7,6 +7,27 @@ export interface LeanProof {
   updatedAt: Date;
 }
 
+export interface SavedProof {
+  id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreateProofRequest {
+  title: string;
+  content: string;
+  tags?: string[];
+}
+
+export interface UpdateProofRequest {
+  title?: string;
+  content?: string;
+  tags?: string[];
+}
+
 export interface LLMResponse {
   suggestion: string;
   confidence: number;

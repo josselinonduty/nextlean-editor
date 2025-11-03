@@ -23,11 +23,6 @@ const navigationItems: NavigationMenuItem[][] = [[
     label: 'Proofs',
     icon: 'tabler:file-text',
     to: '/proofs'
-  },
-  {
-    label: 'Tutorials',
-    icon: 'tabler:book',
-    to: '/tutorials'
   }
 ]]
 
@@ -57,11 +52,11 @@ const footerItems: NavigationMenuItem[][] = [[
       <template #header="{ collapsed }">
         <UIcon 
           v-if="collapsed" 
-          name="tabler:home" 
+          name="tabler:math-symbols" 
           class="size-5 text-primary mx-auto" 
         />
         <div v-else class="flex items-center gap-2">
-          <UIcon name="tabler:home" class="size-5 text-primary" />
+          <UIcon name="tabler:math-symbols" class="size-5 text-primary" />
           <span class="font-semibold text-sm">NextLean</span>
         </div>
       </template>

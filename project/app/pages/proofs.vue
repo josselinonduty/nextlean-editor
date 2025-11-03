@@ -1,0 +1,292 @@
+<script setup lang="ts">
+import type { SavedProof } from '#shared/types'
+
+useSeoMeta({
+  title: 'Proofs - NextLean'
+})
+
+const { proofs, loading, error, fetchProofs, deleteProof } = useProofs()
+const selectedProof = ref<SavedProof | null>(null)
+const showModal = ref(false)
+const searchQuery = ref('')
+const selectedTag = ref<string | null>(null)
+
+const normalizedSearch = computed(() => searchQuery.value.trim().toLowerCase())
+
+const filteredProofs = computed(() => {
+  const term = normalizedSearch.value
+  return proofs.value.filter((proof) => {
+    const matchesSearch = term === '' ||
+      proof.title.toLowerCase().includes(term) ||
+      proof.content.toLowerCase().includes(term) ||
+      proof.tags.some(tag => tag.toLowerCase().includes(term))
+
+    const matchesTag = selectedTag.value === null || proof.tags.includes(selectedTag.value)
+
+    return matchesSearch && matchesTag
+  })
+})
+
+const allTags = computed(() => {
+  const tags = new Set<string>()
+  for (const proof of proofs.value) {
+    for (const tag of proof.tags) {
+      tags.add(tag)
+    }
+  }
+  return Array.from(tags).sort()
+})
+
+onMounted(() => {
+  fetchProofs()
+})
+
+const selectProof = (proof: SavedProof) => {
+  selectedProof.value = proof
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+  selectedProof.value = null
+}
+
+const handleDelete = async (id: string) => {
+  if (confirm('Are you sure you want to delete this proof?')) {
+    await deleteProof(id)
+    if (selectedProof.value?.id === id) {
+      closeModal()
+    }
+  }
+}
+
+const handleLoadProof = () => {
+  if (selectedProof.value) {
+    navigateTo(`/editor?proofId=${selectedProof.value.id}&content=${encodeURIComponent(selectedProof.value.content)}`)
+  }
+}
+
+const formatDate = (timestamp: number) => {
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+</script>
+
+<template>
+  <div class="p-8 space-y-8">
+    <div class="space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="space-y-2">
+          <h1 class="text-4xl font-bold text-gray-900 dark:text-white">
+            Saved Proofs
+          </h1>
+          <p class="text-gray-600 dark:text-gray-400">
+            Browse and manage all your mathematical proofs
+          </p>
+        </div>
+        <NuxtLink to="/editor">
+          <UButton icon="tabler:plus" size="lg" color="info">
+            New Proof
+          </UButton>
+        </NuxtLink>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <UInput
+        v-model="searchQuery"
+        icon="tabler:search"
+        placeholder="Search by title, content, or tags..."
+        size="lg"
+      />
+
+      <div v-if="allTags.length > 0" class="space-y-3">
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by tags</p>
+        <div class="flex flex-wrap gap-2">
+          <UButton
+            v-for="tag in allTags"
+            :key="tag"
+            :variant="selectedTag === tag ? 'solid' : 'soft'"
+            :color="selectedTag === tag ? 'info' : 'gray'"
+            size="sm"
+            @click="selectedTag = selectedTag === tag ? null : tag"
+          >
+            {{ tag }}
+          </UButton>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="error" class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
+      <div class="flex items-center gap-3">
+        <UIcon name="tabler:alert-circle" class="text-lg text-red-600 dark:text-red-400" />
+        <p class="text-red-700 dark:text-red-200">{{ error }}</p>
+      </div>
+    </div>
+
+    <div v-if="loading" class="flex flex-col items-center justify-center py-16 space-y-4">
+      <UIcon name="tabler:loader-2" class="text-4xl animate-spin text-info" />
+      <p class="text-gray-600 dark:text-gray-400">Loading proofs...</p>
+    </div>
+
+    <div v-else-if="proofs.length === 0" class="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 p-12 text-center">
+      <div class="space-y-4">
+        <UIcon name="tabler:inbox" class="text-6xl text-gray-400 dark:text-gray-600 mx-auto" />
+        <div>
+          <p class="text-xl font-semibold text-gray-900 dark:text-white">No proofs yet</p>
+          <p class="text-gray-600 dark:text-gray-400 mt-1">
+            Start writing Lean proofs in the editor and save them to see them here.
+          </p>
+        </div>
+        <NuxtLink to="/editor">
+          <UButton icon="tabler:pencil" color="info" size="lg">
+            Go to Editor
+          </UButton>
+        </NuxtLink>
+      </div>
+    </div>
+
+    <div v-else-if="filteredProofs.length === 0" class="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 p-12 text-center">
+      <div class="space-y-4">
+        <UIcon name="tabler:search-off" class="text-6xl text-gray-400 dark:text-gray-600 mx-auto" />
+        <p class="text-gray-600 dark:text-gray-400">No proofs match your search or filters</p>
+        <UButton variant="soft" @click="searchQuery = ''; selectedTag = null">
+          Clear filters
+        </UButton>
+      </div>
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <UCard
+        v-for="proof in filteredProofs"
+        :key="proof.id"
+        class="hover:shadow-md transition-shadow cursor-pointer group"
+        @click="selectProof(proof)"
+      >
+        <template #header>
+          <div class="space-y-1">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-info transition-colors">
+              {{ proof.title }}
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ formatDate(proof.updatedAt) }}
+            </p>
+          </div>
+        </template>
+
+        <div class="space-y-3">
+          <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
+            {{ proof.content.substring(0, 150) }}{{ proof.content.length > 150 ? '...' : '' }}
+          </p>
+
+          <div v-if="proof.tags && proof.tags.length > 0" class="flex flex-wrap gap-2">
+            <UBadge
+              v-for="tag in proof.tags.slice(0, 3)"
+              :key="tag"
+              variant="soft"
+              color="gray"
+              size="sm"
+            >
+              {{ tag }}
+            </UBadge>
+            <UBadge
+              v-if="proof.tags.length > 3"
+              variant="soft"
+              color="gray"
+              size="sm"
+            >
+              +{{ proof.tags.length - 3 }}
+            </UBadge>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="flex gap-2 justify-end">
+            <UButton
+              color="info"
+              variant="ghost"
+              size="xs"
+              icon="tabler:pencil"
+              @click.stop="handleLoadProof(); closeModal()"
+            >
+              Edit
+            </UButton>
+            <UButton
+              color="gray"
+              variant="ghost"
+              size="xs"
+              icon="tabler:chevron-right"
+              @click.stop="selectProof(proof)"
+            >
+              View
+            </UButton>
+          </div>
+        </template>
+      </UCard>
+    </div>
+
+    <USlideover v-model="showModal" @close="closeModal" side="right">
+      <div v-if="selectedProof" class="p-6 space-y-6">
+        <div class="flex items-center justify-between">
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+            {{ selectedProof.title }}
+          </h2>
+          <UButton color="gray" variant="ghost" icon="tabler:x" size="md" @click="closeModal" />
+        </div>
+
+        <div class="space-y-2">
+          <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Last Updated</p>
+          <p class="text-sm text-gray-700 dark:text-gray-300">
+            {{ formatDate(selectedProof.updatedAt) }}
+          </p>
+        </div>
+
+        <div v-if="selectedProof.tags && selectedProof.tags.length > 0" class="space-y-3">
+          <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Tags</p>
+          <div class="flex flex-wrap gap-2">
+            <UBadge
+              v-for="tag in selectedProof.tags"
+              :key="tag"
+              variant="soft"
+              color="info"
+              size="sm"
+            >
+              {{ tag }}
+            </UBadge>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Content</p>
+          <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800 max-h-96 overflow-y-auto">
+            <pre class="text-sm font-mono text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">{{ selectedProof.content }}</pre>
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-4 border-t border-gray-200 dark:border-gray-800">
+          <UButton
+            block
+            color="info"
+            icon="tabler:edit"
+            @click="handleLoadProof()"
+          >
+            Open in Editor
+          </UButton>
+          <UButton
+            color="red"
+            variant="soft"
+            icon="tabler:trash"
+            @click="handleDelete(selectedProof.id)"
+          >
+            Delete
+          </UButton>
+        </div>
+      </div>
+    </USlideover>
+  </div>
+</template>

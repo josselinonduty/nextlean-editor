@@ -40,8 +40,20 @@ export class JsonRpcMessageHandler {
         this.buffer = this.buffer.slice(this.contentLength);
         this.contentLength = 0;
 
-        const message = JSON.parse(messageStr) as JsonRpcMessage;
-        messages.push(message);
+        try {
+          const message = JSON.parse(messageStr) as JsonRpcMessage;
+          messages.push(message);
+        } catch (parseError) {
+          console.error(
+            "Failed to parse message:",
+            parseError,
+            "Message:",
+            messageStr.substring(0, 200)
+          );
+          this.buffer = "";
+          this.contentLength = 0;
+          break;
+        }
       } catch (error) {
         console.error("Error in parseMessages, resetting buffer:", error);
         this.buffer = "";
