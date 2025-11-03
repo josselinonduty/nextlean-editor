@@ -52,3 +52,6 @@ export interface LeanAnalysis {
   isHovering: boolean;
   hasContent: boolean;
 }
+
+export * from "./jsonrpc";
+export * from "./lsp";

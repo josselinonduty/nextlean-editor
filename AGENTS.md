@@ -34,3 +34,5 @@ Use `tabler:$icon` for icons.
 NEVER add comments UNLESS I explicitly ask for it. No "//", "/_ ... _/", or "<!-- ... -->" comments.
 
 Always put `<script setup lang="ts">` at the top of the file, even before `<template>`, and even if there is no script code.
+
+Avoid using system commands agent (i.e., shell commands) at all cost. It does NOT work in my environment. If you need information from the system, ask me to run a command and give you the output.

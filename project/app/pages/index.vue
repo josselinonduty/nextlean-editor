@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Set page title using useSeoMeta
 useSeoMeta({
   title: 'Home - NextLean'
 })
@@ -24,11 +23,10 @@ useSeoMeta({
       </h2>
       
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Lean Editor Card -->
         <UCard class="hover:shadow-lg transition-shadow cursor-pointer group">
           <template #header>
             <div class="flex items-center gap-3">
-              <UIcon name="tabler:code" class="text-2xl text-primary" />
+              <UIcon name="tabler:code" class="text-2xl text-info" />
               <h3 class="text-xl font-semibold">Lean Editor</h3>
             </div>
           </template>
@@ -41,14 +39,17 @@ useSeoMeta({
             <NuxtLink to="/editor">
               <UButton 
                 block 
+                color="info"
                 icon="tabler:arrow-right"
-                class="group-hover:bg-primary-600"
+                class="group-hover:bg-info-600"
               >
                 Open Editor
               </UButton>
             </NuxtLink>
           </div>
         </UCard>
+
+        <!-- Duplicate Lean Editor card removed: editor-ws has been consolidated into /editor -->
 
         <!-- Proofs Card -->
         <UCard class="hover:shadow-lg transition-shadow cursor-pointer group">

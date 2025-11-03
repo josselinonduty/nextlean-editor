@@ -13,6 +13,15 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   ssr: false,
 
+  nitro: {
+    experimental: {
+      websocket: true,
+    },
+    devServer: {
+      watch: [],
+    },
+  },
+
   alias: {
     "@server": new URL("./server", import.meta.url).pathname,
     "#server": new URL("./server", import.meta.url).pathname,
@@ -36,6 +45,7 @@ export default defineNuxtConfig({
             ),
             dest: "monaco-editor/min/vs",
           },
+          // Infoview and related assets removed; using built-in Monaco without lean-specific assets
         ],
       }),
     ],
