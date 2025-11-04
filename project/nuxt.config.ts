@@ -55,4 +55,8 @@ export default defineNuxtConfig({
       },
     },
   },
+
+  runtimeConfig: {
+    openRouterApiKey: "",
+  },
 });

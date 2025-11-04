@@ -27,10 +27,19 @@ export async function initializeDatabase(): Promise<Database.Database> {
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       tags TEXT,
+      embedding TEXT,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL
     )
   `);
+
+  const columns = db.prepare("PRAGMA table_info(proofs)").all() as Array<{
+    name: string;
+  }>;
+  const hasEmbedding = columns.some((column) => column.name === "embedding");
+  if (!hasEmbedding) {
+    db.exec("ALTER TABLE proofs ADD COLUMN embedding TEXT");
+  }
 
   return db;
 }

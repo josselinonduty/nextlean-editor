@@ -20,6 +20,11 @@ const navigationItems: NavigationMenuItem[][] = [[
     to: '/editor'
   },
   {
+    label: 'LLM Chat',
+    icon: 'tabler:message-circle',
+    to: '/chat'
+  },
+  {
     label: 'Proofs',
     icon: 'tabler:file-text',
     to: '/proofs'

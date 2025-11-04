@@ -11,10 +11,13 @@
   },
   "dependencies": {
     "@iconify-json/tabler": "^1.2.23",
+    "@langchain/core": "^1.0.2",
+    "@langchain/openai": "^1.0.0",
     "@monaco-editor/loader": "^1.5.0",
     "@nuxt/ui": "4.0.0",
     "better-sqlite3": "^12.4.1",
     "json-rpc-2.0": "^1.7.1",
+    "langchain": "^1.0.2",
     "memfs": "^4.43.0",
     "monaco-editor": "^0.54.0",
     "nuxt": "^4.1.2",

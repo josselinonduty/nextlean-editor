@@ -22,7 +22,7 @@ useSeoMeta({
         Quick Actions
       </h2>
       
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <UCard class="hover:shadow-lg transition-shadow cursor-pointer group">
           <template #header>
             <div class="flex items-center gap-3">
@@ -44,6 +44,32 @@ useSeoMeta({
                 class="group-hover:bg-info-600"
               >
                 Open Editor
+              </UButton>
+            </NuxtLink>
+          </div>
+        </UCard>
+
+        <UCard class="hover:shadow-lg transition-shadow cursor-pointer group">
+          <template #header>
+            <div class="flex items-center gap-3">
+              <UIcon name="tabler:message-circle" class="text-2xl text-success" />
+              <h3 class="text-xl font-semibold">LLM Chat</h3>
+            </div>
+          </template>
+
+          <div class="space-y-3">
+            <p class="text-gray-600 dark:text-gray-400">
+              Discuss Lean strategies with the AI assistant, get suggestions, and reference relevant saved proofs.
+            </p>
+
+            <NuxtLink to="/chat">
+              <UButton
+                block
+                color="success"
+                icon="tabler:arrow-right"
+                class="group-hover:bg-success-600"
+              >
+                Open Chat
               </UButton>
             </NuxtLink>
           </div>

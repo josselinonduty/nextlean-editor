@@ -6,6 +6,7 @@ export interface ProofRow {
   title: string;
   content: string;
   tags: string | null;
+  embedding: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -72,6 +73,51 @@ export const mapProofRow = (row: ProofRow): SavedProof => ({
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
+
+export const parseEmbedding = (raw: string | null): number[] | null => {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const vector = parsed.map((value) => Number(value));
+    if (vector.length === 0) return null;
+    if (vector.every((value) => Number.isFinite(value))) {
+      return vector;
+    }
+  } catch {}
+  return null;
+};
+
+export interface ProofEmbeddingEntry {
+  id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  embedding: number[];
+  updatedAt: number;
+}
+
+export const loadProofEmbeddings = (
+  db: Database.Database
+): ProofEmbeddingEntry[] => {
+  const rows = db
+    .prepare("SELECT * FROM proofs WHERE embedding IS NOT NULL")
+    .all() as ProofRow[];
+  const entries: ProofEmbeddingEntry[] = [];
+  for (const row of rows) {
+    const vector = parseEmbedding(row.embedding);
+    if (!vector) continue;
+    entries.push({
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      tags: deserializeTags(row.tags),
+      embedding: vector,
+      updatedAt: row.updatedAt,
+    });
+  }
+  return entries;
+};
 
 export const findProofById = (
   db: Database.Database,

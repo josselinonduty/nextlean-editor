@@ -1043,31 +1043,8 @@ watch(() => proofsError.value, (message) => {
             </template>
             
             <template #assist>
-              <div class="h-full w-full flex flex-col">
-                <div class="flex-1 p-4 flex items-center justify-center">
-                  <div class="text-center space-y-4">
-                    <div class="flex justify-center">
-                      <div class="relative">
-                        <UIcon name="tabler:robot" class="w-12 h-12 text-gray-400 dark:text-gray-600" />
-                        <div class="absolute -top-1 -right-1">
-                          <div class="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="space-y-2">
-                      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                        AI Assistant
-                      </h3>
-                      <p class="text-sm text-gray-600 dark:text-gray-400 max-w-xs">
-                        The AI assistant is currently being developed and will provide intelligent help with your Lean proofs.
-                      </p>
-                    </div>
-                    <div class="flex items-center justify-center gap-2 text-xs text-orange-600 dark:text-orange-400">
-                      <UIcon name="tabler:clock" class="w-4 h-4" />
-                      <span>Work in Progress</span>
-                    </div>
-                  </div>
-                </div>
+              <div class="h-full w-full p-3">
+                <AssistantChatPanel />
               </div>
             </template>
           </UTabs>
