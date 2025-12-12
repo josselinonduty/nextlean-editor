@@ -21,7 +21,7 @@
     "langchain": "^1.0.2",
     "marked": "^17.0.1",
     "memfs": "^4.43.0",
-    "monaco-editor": "^0.55.1",
+    "monaco-editor": "^0.54.0",
     "nuxt": "^4.1.2",
     "typescript": "^5.9.2",
     "vite-plugin-node-polyfills": "0.17.0",
