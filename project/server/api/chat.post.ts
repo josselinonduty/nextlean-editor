@@ -2,19 +2,25 @@ import { useRuntimeConfig } from "#imports";
 import { initializeDatabase } from "#server/db";
 import {
   deserializeTags,
-  parseEmbedding,
+  findProofById,
   type ProofRow,
 } from "#server/utils/proofs";
-import {
-  createChatModel,
-  createEmbeddingModel,
-  cosineSimilarity,
-} from "#server/utils/openrouter";
+import { createChatModel } from "#server/utils/openrouter";
 import {
   AIMessage,
   HumanMessage,
   SystemMessage,
+  ToolMessage,
+  type BaseMessage,
 } from "@langchain/core/messages";
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+import { appendFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+
+const execAsync = promisify(exec);
 
 type ChatRole = "user" | "assistant" | "system";
 
@@ -25,17 +31,8 @@ interface ChatMessageInput {
 
 interface ChatRequestBody {
   messages: ChatMessageInput[];
-}
-
-type ProofsDatabase = Awaited<ReturnType<typeof initializeDatabase>>;
-
-interface ProofEmbeddingData {
-  id: string;
-  title: string;
-  content: string;
-  tags: string[];
-  embedding: number[];
-  updatedAt: number;
+  editorContent?: string;
+  diagnostics?: unknown[];
 }
 
 const getTextContent = (value: unknown): string => {
@@ -64,112 +61,6 @@ const toMessage = (message: ChatMessageInput) => {
   if (message.role === "system") return new SystemMessage(message.content);
   return new HumanMessage(message.content);
 };
-
-const buildContext = (
-  related: Array<{
-    title: string;
-    tags: string[];
-    content: string;
-  }>
-) => {
-  if (related.length === 0) return "";
-  return related
-    .map((entry, index) => {
-      const tagsLine = entry.tags.length > 0 ? entry.tags.join(", ") : "None";
-      const snippet =
-        entry.content.length > 1200
-          ? `${entry.content.slice(0, 1200)}...`
-          : entry.content;
-      return `Proof ${index + 1}: ${
-        entry.title
-      }\nTags: ${tagsLine}\n${snippet}`;
-    })
-    .join("\n\n");
-};
-
-const hydrateProofEmbeddings = async (
-  db: ProofsDatabase,
-  embeddingModel: ReturnType<typeof createEmbeddingModel>
-): Promise<ProofEmbeddingData[]> => {
-  const entries: ProofEmbeddingData[] = [];
-  const rows = db.prepare("SELECT * FROM proofs").all() as ProofRow[];
-  const pending: ProofRow[] = [];
-
-  for (const row of rows) {
-    const vector = parseEmbedding(row.embedding);
-    if (vector) {
-      entries.push({
-        id: row.id,
-        title: row.title,
-        content: row.content,
-        tags: deserializeTags(row.tags),
-        embedding: vector,
-        updatedAt: row.updatedAt,
-      });
-    } else {
-      pending.push(row);
-    }
-  }
-
-  if (pending.length === 0) {
-    return entries;
-  }
-
-  for (const row of pending) {
-    try {
-      const vector = await embeddingModel.embedQuery(row.content);
-      const serialized = JSON.stringify(vector);
-      db.prepare("UPDATE proofs SET embedding = ? WHERE id = ?").run(
-        serialized,
-        row.id
-      );
-      entries.push({
-        id: row.id,
-        title: row.title,
-        content: row.content,
-        tags: deserializeTags(row.tags),
-        embedding: vector,
-        updatedAt: row.updatedAt,
-      });
-    } catch (error) {
-      console.error("Failed to generate embedding for proof", {
-        id: row.id,
-        error,
-      });
-    }
-  }
-
-  return entries;
-};
-
-const scoreProofs = (entries: ProofEmbeddingData[], queryVector: number[]) =>
-  entries
-    .map((entry) => ({
-      entry,
-      score: cosineSimilarity(queryVector, entry.embedding),
-    }))
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map(({ entry, score }) => ({ entry, score }));
-
-const formatRelatedProofs = (
-  scored: Array<{ entry: ProofEmbeddingData; score: number }>
-) =>
-  scored.map(({ entry, score }) => {
-    const snippet =
-      entry.content.length > 320
-        ? `${entry.content.slice(0, 320)}...`
-        : entry.content;
-    return {
-      id: entry.id,
-      title: entry.title,
-      snippet,
-      tags: entry.tags,
-      updatedAt: entry.updatedAt,
-      relevance: score,
-    };
-  });
 
 const normalizeChatBody = (body: ChatRequestBody) => {
   if (!body || !Array.isArray(body.messages) || body.messages.length === 0) {
@@ -200,39 +91,17 @@ const normalizeChatBody = (body: ChatRequestBody) => {
     });
   }
 
-  const lastUserMessage = [...normalizedMessages]
-    .reverse()
-    .find((message) => message.role === "user");
-
-  if (!lastUserMessage) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: "A user message is required",
-    });
-  }
-
-  return { normalizedMessages, lastUserMessage };
-};
-
-const computeScoredProofs = async (
-  embeddingModel: ReturnType<typeof createEmbeddingModel>,
-  entries: ProofEmbeddingData[],
-  query: string
-) => {
-  if (entries.length === 0)
-    return [] as Array<{ entry: ProofEmbeddingData; score: number }>;
-  try {
-    const vector = await embeddingModel.embedQuery(query);
-    return scoreProofs(entries, vector);
-  } catch (error) {
-    console.error("Failed to compute proof similarity", error);
-    return [] as Array<{ entry: ProofEmbeddingData; score: number }>;
-  }
+  return {
+    normalizedMessages,
+    editorContent: body.editorContent || "",
+    diagnostics: body.diagnostics || [],
+  };
 };
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<ChatRequestBody>(event);
-  const { normalizedMessages } = normalizeChatBody(body);
+  const { normalizedMessages, editorContent, diagnostics } =
+    normalizeChatBody(body);
 
   const config = useRuntimeConfig(event);
   const apiKey = config.openRouterApiKey;
@@ -243,56 +112,287 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const proofEntries: ProofEmbeddingData[] = [];
-  const scoredProofs: Array<{ entry: ProofEmbeddingData; score: number }> = [];
-  const context = buildContext(
-    scoredProofs.map(({ entry }) => ({
-      title: entry.title,
-      tags: entry.tags,
-      content: entry.content,
-    }))
+  const db = await initializeDatabase();
+
+  const listProofsTool = tool(
+    async (input) => {
+      const { query } = input as { query: string };
+      const rows = db
+        .prepare("SELECT id, title, tags FROM proofs")
+        .all() as Pick<ProofRow, "id" | "title" | "tags">[];
+      const results = rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        tags: deserializeTags(row.tags),
+      }));
+
+      if (!query || query.trim() === "")
+        return JSON.stringify(results.slice(0, 20));
+
+      const lowerQuery = query.toLowerCase();
+      const filtered = results.filter(
+        (r) =>
+          r.title.toLowerCase().includes(lowerQuery) ||
+          r.tags.some((t) => t.toLowerCase().includes(lowerQuery))
+      );
+      return JSON.stringify(filtered.slice(0, 10));
+    },
+    {
+      name: "list_proofs",
+      description:
+        "List available proofs in the library. Can filter by query string matching title or tags.",
+      schema: z.object({
+        query: z
+          .string()
+          .describe(
+            "Search query to filter proofs. Pass an empty string to list all proofs."
+          ),
+      }),
+    }
   );
 
-  const systemInstruction =
-    "You are NextLean, an expert Lean 4 assistant. Answer succinctly, focus on Lean tactics, and explain reasoning when helpful. Cite retrieved proofs by title when they inform your answer.";
+  const getProofTool = tool(
+    async (input) => {
+      const { id } = input as { id: string };
+      const proof = findProofById(db, id);
+      if (!proof) return "Proof not found.";
+      return JSON.stringify({
+        id: proof.id,
+        title: proof.title,
+        content: proof.content,
+        tags: deserializeTags(proof.tags),
+      });
+    },
+    {
+      name: "get_proof",
+      description: "Get the full content of a specific proof by its ID.",
+      schema: z.object({
+        id: z.string().describe("The ID of the proof to retrieve"),
+      }),
+    }
+  );
 
-  const messages: Array<AIMessage | SystemMessage | HumanMessage> = [
-    new SystemMessage(systemInstruction),
+  const readEditorTool = tool(
+    async (input) => {
+      const { startLine, endLine } = input as {
+        startLine?: number;
+        endLine?: number;
+      };
+      const lines = editorContent.split("\n");
+
+      if (startLine === undefined && endLine === undefined) {
+        return editorContent || "Editor is empty.";
+      }
+
+      // 1-based indexing
+      const start = Math.max(0, (startLine || 1) - 1);
+      const end = endLine ? Math.min(lines.length, endLine) : lines.length;
+
+      const content = lines.slice(start, end).join("\n");
+      return content || "No content in specified range.";
+    },
+    {
+      name: "read_editor",
+      description:
+        "Read the content of the editor. If startLine/endLine are omitted, reads the entire file.",
+      schema: z.object({
+        startLine: z
+          .number()
+          .optional()
+          .describe("Start line number (1-based)"),
+        endLine: z.number().optional().describe("End line number (1-based)"),
+      }),
+    }
+  );
+
+  const editEditorTool = tool(
+    async (input) => {
+      return "Edit scheduled for client execution.";
+    },
+    {
+      name: "edit_editor",
+      description:
+        "Edit the content of the editor. Replaces lines from startLine to endLine with newContent.",
+      schema: z.object({
+        startLine: z.number().describe("Start line number (1-based)"),
+        endLine: z.number().describe("End line number (1-based)"),
+        newContent: z.string().describe("The new content to insert"),
+      }),
+    }
+  );
+
+  const addDependencyTool = tool(
+    async (input) => {
+      const { name, url } = input as { name: string; url: string };
+      const projectPath = join(process.cwd(), "lean_project");
+      const lakefilePath = join(projectPath, "lakefile.lean");
+
+      if (!existsSync(lakefilePath)) {
+        return "Error: lakefile.lean not found.";
+      }
+
+      // Check if already exists (naive check)
+      // In a real app, we should parse the file.
+      // Here we just append.
+
+      const dependencyString = `\nrequire ${name} from git\n  "${url}"\n`;
+
+      try {
+        appendFileSync(lakefilePath, dependencyString);
+
+        // Run lake update
+        // We don't wait for it to finish because it takes too long?
+        // Or we wait? It might timeout the request.
+        // Let's trigger it and return "started".
+
+        exec("lake update", { cwd: projectPath }, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`lake update error: ${error}`);
+            return;
+          }
+          console.log(`lake update stdout: ${stdout}`);
+        });
+
+        return `Dependency '${name}' added to lakefile.lean. 'lake update' started in background.`;
+      } catch (e: any) {
+        return `Failed to add dependency: ${e.message}`;
+      }
+    },
+    {
+      name: "add_dependency",
+      description: "Add a dependency to the Lake project (e.g., Mathlib).",
+      schema: z.object({
+        name: z.string().describe("The name of the dependency (e.g., mathlib)"),
+        url: z.string().describe("The git URL of the dependency"),
+      }),
+    }
+  );
+
+  const getDiagnosticsTool = tool(
+    async () => {
+      if (!diagnostics || diagnostics.length === 0) {
+        return "No diagnostics available.";
+      }
+      return JSON.stringify(diagnostics, null, 2);
+    },
+    {
+      name: "get_diagnostics",
+      description:
+        "Get the current diagnostics (errors, warnings, info) from the Lean editor.",
+      schema: z.object({}),
+    }
+  );
+
+  const tools = [
+    listProofsTool,
+    getProofTool,
+    readEditorTool,
+    editEditorTool,
+    addDependencyTool,
+    getDiagnosticsTool,
   ];
-  if (context) {
-    messages.push(
-      new SystemMessage(
-        `Relevant proofs from the library:\n\n${context}\n\nReference proofs by their titles when applicable.`
-      )
-    );
-  }
-  messages.push(...normalizedMessages.map(toMessage));
+  const toolsByName = {
+    list_proofs: listProofsTool,
+    get_proof: getProofTool,
+    read_editor: readEditorTool,
+    edit_editor: editEditorTool,
+    add_dependency: addDependencyTool,
+    get_diagnostics: getDiagnosticsTool,
+  };
 
-  const chatModel = createChatModel(apiKey);
+  const chatModel = createChatModel(apiKey).bindTools(tools);
+
+  const toolDescriptions = tools
+    .map((t) => `- ${t.name}: ${t.description}`)
+    .join("\n");
+
+  const systemInstruction = `You are NextLean, an expert Lean 4 assistant.
+Your primary goal is to assist the user in the editor. You should actively edit the content of the editor to help the user.
+You have access to the following tools to help you answer questions about the proof library and manipulate the editor:
+
+${toolDescriptions}
+
+PROTOCOL:
+- If the user asks about existing proofs or the library:
+  1. Call 'list_proofs' with an empty string query ("") to list ALL available proofs.
+  2. Inspect the list and use 'get_proof' for details.
+- If the user asks to read or modify the current editor content:
+  1. Use 'read_editor' to inspect the code.
+  2. Use 'edit_editor' to make changes.
+- If the user asks about errors or checking the code:
+  1. Use 'get_diagnostics' to see current errors/warnings.
+  2. Use 'read_editor' to see the context.
+- Always answer the user's question after using the necessary tools.
+
+Answer succinctly, focus on Lean tactics, and explain reasoning when helpful.
+When providing code solutions, ALWAYS try to apply them directly using the 'edit_editor' tool.`;
+
+  const messages: BaseMessage[] = [
+    new SystemMessage(systemInstruction),
+    ...normalizedMessages.map(toMessage),
+  ];
+
   let reply = "";
+  const steps: Array<{ name: string; input: unknown; output: string }> = [];
+
   try {
-    const response = await chatModel.invoke(messages);
+    let response = await chatModel.invoke(messages);
+    messages.push(response);
+
+    // Tool execution loop
+    let iterations = 0;
+    const MAX_ITERATIONS = 5;
+
+    while (
+      response.tool_calls &&
+      response.tool_calls.length > 0 &&
+      iterations < MAX_ITERATIONS
+    ) {
+      iterations++;
+      for (const toolCall of response.tool_calls) {
+        const selectedTool =
+          toolsByName[toolCall.name as keyof typeof toolsByName];
+        if (!selectedTool) {
+          messages.push(
+            new ToolMessage({
+              tool_call_id: toolCall.id!,
+              content: "Tool not found",
+            })
+          );
+          continue;
+        }
+        const toolMessage = await selectedTool.invoke(toolCall);
+
+        steps.push({
+          name: toolCall.name,
+          input: toolCall.args,
+          output:
+            typeof toolMessage.content === "string"
+              ? toolMessage.content
+              : JSON.stringify(toolMessage.content),
+        });
+
+        messages.push(toolMessage);
+      }
+      response = await chatModel.invoke(messages);
+      messages.push(response);
+    }
+
     reply = getTextContent(response.content).trim();
-  } catch (error) {
-    console.error("OpenRouter chat invocation failed", error);
+  } catch (error: any) {
+    console.error("Chat error:", error);
+    if (error?.response?.data) {
+      console.error(
+        "Error response data:",
+        JSON.stringify(error.response.data, null, 2)
+      );
+    }
     const detail = (() => {
       if (!error || typeof error !== "object") return null;
       const asAny = error as Record<string, unknown>;
       if (typeof asAny.message === "string") {
         return asAny.message;
       }
-      if (asAny.error && typeof asAny.error === "object") {
-        const nested = asAny.error as Record<string, unknown>;
-        if (typeof nested.message === "string") {
-          return nested.message;
-        }
-      }
-      const response = asAny.response as
-        | { statusText?: string; data?: { error?: string; message?: string } }
-        | undefined;
-      if (response?.data?.error) return response.data.error;
-      if (response?.data?.message) return response.data.message;
-      if (typeof response?.statusText === "string") return response.statusText;
       return null;
     })();
     throw createError({
@@ -305,10 +405,8 @@ export default defineEventHandler(async (event) => {
     reply = "I was unable to generate a response. Please try asking again.";
   }
 
-  const formattedProofs = formatRelatedProofs(scoredProofs);
-
   return {
     message: reply,
-    relatedProofs: formattedProofs,
+    steps,
   };
 });

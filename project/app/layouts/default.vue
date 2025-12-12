@@ -98,7 +98,9 @@ const footerItems: NavigationMenuItem[][] = [[
 
       <!-- Page Content -->
       <template #body>
-        <slot />
+        <div class="h-full flex flex-col overflow-hidden min-h-0">
+          <slot />
+        </div>
       </template>
     </UDashboardPanel>
   </UDashboardGroup>

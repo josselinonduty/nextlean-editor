@@ -10,7 +10,10 @@ import { useLeanServer } from "./useLeanServer";
 
 export function useLeanLsp() {
   const leanServer = useLeanServer();
-  const diagnostics = ref<PublishDiagnosticsParams[]>([]);
+  const diagnostics = useState<PublishDiagnosticsParams[]>(
+    "lean-diagnostics",
+    () => []
+  );
 
   function setupDiagnosticsListener() {
     return leanServer.onMessage((message: JsonRpcMessage) => {

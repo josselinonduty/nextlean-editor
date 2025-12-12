@@ -1,5 +1,4 @@
 import type { H3Event } from "h3";
-import { useRuntimeConfig } from "#imports";
 import { initializeDatabase } from "#server/db";
 import {
   findProofById,
@@ -8,7 +7,6 @@ import {
   serializeTags,
   type ProofRow,
 } from "#server/utils/proofs";
-import { createEmbeddingModel } from "#server/utils/openrouter";
 
 type ProofsDatabase = Awaited<ReturnType<typeof initializeDatabase>>;
 
@@ -48,25 +46,9 @@ const handlePut = async (event: H3Event, db: ProofsDatabase, id: string) => {
     tagsValue = serializeTags(normalizedTags);
   }
 
-  let embeddingValue = existing.embedding;
-  const contentChanged = content !== existing.content;
-  if (contentChanged) {
-    const config = useRuntimeConfig(event);
-    const apiKey = config.openRouterApiKey;
-    if (apiKey) {
-      const embeddingModel = createEmbeddingModel(apiKey);
-      try {
-        const vector = await embeddingModel.embedQuery(content);
-        embeddingValue = JSON.stringify(vector);
-      } catch (error) {
-        console.error("Failed to generate embedding", error);
-      }
-    }
-  }
-
   db.prepare(
-    "UPDATE proofs SET title = ?, content = ?, tags = ?, embedding = ?, updatedAt = ? WHERE id = ?"
-  ).run(title, content, tagsValue, embeddingValue, now, id);
+    "UPDATE proofs SET title = ?, content = ?, tags = ?, updatedAt = ? WHERE id = ?"
+  ).run(title, content, tagsValue, now, id);
 
   const updated = findProofById(db, id) as ProofRow | undefined;
   if (!updated) {

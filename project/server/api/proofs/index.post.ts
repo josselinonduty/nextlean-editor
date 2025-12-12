@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { useRuntimeConfig } from "#imports";
 import { initializeDatabase } from "#server/db";
 import {
   mapProofRow,
@@ -7,7 +6,6 @@ import {
   serializeTags,
   type ProofRow,
 } from "#server/utils/proofs";
-import { createEmbeddingModel } from "#server/utils/openrouter";
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -30,25 +28,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const config = useRuntimeConfig(event);
-  const apiKey = config.openRouterApiKey;
-  if (!apiKey) {
-    console.warn(
-      "OpenRouter API key not configured, skipping embedding generation"
-    );
-  }
-
   const content = body.content;
-  let embeddingValue: string | null = null;
-  if (apiKey) {
-    const embeddingModel = createEmbeddingModel(apiKey);
-    try {
-      const vector = await embeddingModel.embedQuery(content);
-      embeddingValue = JSON.stringify(vector);
-    } catch (error) {
-      console.error("Failed to generate embedding", error);
-    }
-  }
 
   const db = await initializeDatabase();
   const now = Date.now();
@@ -58,8 +38,8 @@ export default defineEventHandler(async (event) => {
   const tagsValue = serializeTags(normalizedTags);
 
   db.prepare(
-    "INSERT INTO proofs (id, title, content, tags, embedding, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(id, title, content, tagsValue, embeddingValue, now, now);
+    "INSERT INTO proofs (id, title, content, tags, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(id, title, content, tagsValue, now, now);
 
   const created = db.prepare("SELECT * FROM proofs WHERE id = ?").get(id) as
     | ProofRow

@@ -24,7 +24,6 @@ export class JsonRpcMessageHandler {
           const contentLengthMatch = contentLengthRegex.exec(headers);
 
           if (!contentLengthMatch) {
-            console.error("Missing Content-Length header, resetting buffer");
             this.buffer = "";
             this.contentLength = 0;
             break;
@@ -43,19 +42,12 @@ export class JsonRpcMessageHandler {
         try {
           const message = JSON.parse(messageStr) as JsonRpcMessage;
           messages.push(message);
-        } catch (parseError) {
-          console.error(
-            "Failed to parse message:",
-            parseError,
-            "Message:",
-            messageStr.substring(0, 200)
-          );
+        } catch {
           this.buffer = "";
           this.contentLength = 0;
           break;
         }
-      } catch (error) {
-        console.error("Error in parseMessages, resetting buffer:", error);
+      } catch {
         this.buffer = "";
         this.contentLength = 0;
         break;

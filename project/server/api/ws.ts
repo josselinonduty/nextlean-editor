@@ -1,4 +1,5 @@
 import type { Peer } from "crossws";
+import { join } from "node:path";
 import type { JsonRpcMessage } from "#shared/types/jsonrpc";
 
 const sessions = new Map<
@@ -8,8 +9,6 @@ const sessions = new Map<
 
 export default defineWebSocketHandler({
   async open(peer: Peer) {
-    console.log(`[WS] Client connected: ${peer.id}`);
-
     const server = new LeanServerManager();
     sessions.set(peer.id, { server, ready: false });
 
@@ -17,30 +16,31 @@ export default defineWebSocketHandler({
       try {
         peer.send(JSON.stringify(message));
       } catch (error) {
-        console.error(
-          `[WS] Failed to send message to client ${peer.id}:`,
-          error
-        );
+        console.error(`Failed to send message to client:`, error);
       }
     });
 
     try {
-      await server.start("/tmp/lean-workspace");
+      // Use the persistent lean_project directory
+      // process.cwd() is usually the project root (where package.json is)
+      const projectPath = join(process.cwd(), "lean_project");
+      await server.start(projectPath);
       const session = sessions.get(peer.id);
       if (session) {
         session.ready = true;
       }
-      console.log(`[WS] Lean server initialized for ${peer.id}`);
 
       peer.send(
         JSON.stringify({
           jsonrpc: "2.0",
           method: "$/serverReady",
-          params: {},
+          params: {
+            rootUri: `file://${projectPath}`,
+          },
         })
       );
     } catch (error) {
-      console.error(`[WS] Failed to start Lean server for ${peer.id}:`, error);
+      console.error(`Failed to start Lean server:`, error);
       peer.close(1011, "Server initialization failed");
     }
   },
@@ -48,13 +48,12 @@ export default defineWebSocketHandler({
   async message(peer: Peer, message) {
     const session = sessions.get(peer.id);
     if (!session) {
-      console.error(`[WS] No server session found for ${peer.id}`);
+      console.error(`No server session found`);
       peer.close(1011, "No server session");
       return;
     }
 
     if (!session.ready) {
-      console.warn(`[WS] Server not ready for ${peer.id}, ignoring message`);
       return;
     }
 
@@ -76,7 +75,7 @@ export default defineWebSocketHandler({
         server.sendNotification(data.method, data.params);
       }
     } catch (error) {
-      console.error(`[WS] Error handling message from ${peer.id}:`, error);
+      console.error(`Error handling message:`, error);
       peer.send(
         JSON.stringify({
           jsonrpc: "2.0",
@@ -91,7 +90,6 @@ export default defineWebSocketHandler({
   },
 
   async close(peer: Peer) {
-    console.log(`[WS] Client disconnected: ${peer.id}`);
     const session = sessions.get(peer.id);
     if (session) {
       await session.server.stop();
@@ -100,6 +98,6 @@ export default defineWebSocketHandler({
   },
 
   async error(peer: Peer, error) {
-    console.error(`[WS] WebSocket error for ${peer.id}:`, error);
+    console.error(`WebSocket error:`, error);
   },
 });

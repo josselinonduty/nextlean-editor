@@ -4,6 +4,15 @@ export function useLeanServer() {
   const ws = ref<WebSocket>();
   const connected = ref(false);
   const ready = ref(false);
+  const rootUri = ref<string | null>(null);
+  const serverStatus = ref<string>("disconnected");
+  const consoleMessages = ref<
+    Array<{
+      message: string;
+      type: "info" | "error" | "success";
+      timestamp: number;
+    }>
+  >([]);
   const pendingRequests = new Map<
     string | number,
     {
@@ -21,7 +30,7 @@ export function useLeanServer() {
 
     ws.value.onopen = () => {
       connected.value = true;
-      console.log("[WS] Connected to Lean server");
+      serverStatus.value = "connected";
     };
 
     ws.value.onmessage = (event) => {
@@ -30,7 +39,25 @@ export function useLeanServer() {
 
         if ("method" in message && message.method === "$/serverReady") {
           ready.value = true;
-          console.log("[WS] Server is ready");
+          serverStatus.value = "ready";
+          const params = message.params as { rootUri?: string };
+          if (params?.rootUri) {
+            rootUri.value = params.rootUri;
+          }
+          return;
+        }
+
+        if ("method" in message && message.method === "$/serverStatus") {
+          const params = message.params as {
+            message: string;
+            type: "info" | "error" | "success";
+          };
+          serverStatus.value = params.message;
+          consoleMessages.value.push({
+            message: params.message,
+            type: params.type,
+            timestamp: Date.now(),
+          });
           return;
         }
 
@@ -49,25 +76,27 @@ export function useLeanServer() {
         for (const handler of messageHandlers) {
           handler(message);
         }
-      } catch (error) {
-        console.error("[WS] Error parsing message:", error);
+      } catch {
+        // Silent fail on parse errors
       }
     };
 
     ws.value.onclose = () => {
       connected.value = false;
       ready.value = false;
-      console.log("[WS] Disconnected from Lean server");
+      serverStatus.value = "disconnected";
     };
 
-    ws.value.onerror = (error) => {
-      console.error("[WS] WebSocket error:", error);
+    ws.value.onerror = () => {
+      // Silent fail on connection errors
+      serverStatus.value = "error";
     };
   }
 
   async function sendRequest(
     method: string,
-    params?: unknown
+    params?: unknown,
+    timeoutMs: number = 30000
   ): Promise<unknown> {
     if (!ws.value || !connected.value) {
       throw new Error("Not connected to Lean server");
@@ -89,12 +118,14 @@ export function useLeanServer() {
       pendingRequests.set(id, { resolve, reject });
       ws.value!.send(JSON.stringify(request));
 
-      setTimeout(() => {
-        if (pendingRequests.has(id)) {
-          pendingRequests.delete(id);
-          reject(new Error(`Request timeout: ${method}`));
-        }
-      }, 30000);
+      if (timeoutMs > 0) {
+        setTimeout(() => {
+          if (pendingRequests.has(id)) {
+            pendingRequests.delete(id);
+            reject(new Error(`Request timeout: ${method}`));
+          }
+        }, timeoutMs);
+      }
     });
   }
 
@@ -136,6 +167,9 @@ export function useLeanServer() {
   return {
     connected,
     ready,
+    rootUri,
+    serverStatus,
+    consoleMessages,
     connect,
     disconnect,
     sendRequest,
