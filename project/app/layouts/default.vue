@@ -98,7 +98,7 @@ const footerItems: NavigationMenuItem[][] = [[
 
       <!-- Page Content -->
       <template #body>
-        <div class="h-full flex flex-col overflow-hidden min-h-0">
+        <div class="h-full flex flex-col overflow-y-auto min-h-0">
           <slot />
         </div>
       </template>
