@@ -37,10 +37,10 @@ NextLean bridges the gap between formal theorem proving and artificial intellige
     Edit the `.env` file to set your OpenRouter API key and other configurations as needed.
 
 4.  Initialize the Lean project (if not already done):
-    The application expects a Lean project structure in `project/lean_project`. The server will attempt to spawn `lake` from this directory.
+    The application expects a Lean project structure in `lean_project`. The server will attempt to spawn `lake` from this directory.
 
     ```bash
-    cd project/lean_project
+    cd lean_project
     lake build
     ```
 
@@ -69,7 +69,7 @@ The application will be available at `http://localhost:3000`.
 To preview the production build locally:
 
 ```bash
-cp -r lean_project .output/project/
+cp -r lean_project .output/
 pnpm preview
 ```
 
@@ -100,7 +100,7 @@ The project follows the Nuxt 4 directory structure:
   - `api/`: API endpoints and WebSocket handler (`ws.ts`) for the Lean server.
   - `utils/`: Server utilities, including the `LeanServerManager` and LangChain tools.
 - `shared/`: Code shared between client and server (types, constants).
-- `project/lean_project/`: The contained Lean 4 project environment.
+- `lean_project/`: The contained Lean 4 project environment.
 
 ### Technologies
 
@@ -115,5 +115,5 @@ The project follows the Nuxt 4 directory structure:
 
 The application runs a local instance of the Lean server. It is configured to work with `Mathlib`.
 
-- **Lakefile**: Located at `project/lean_project/lakefile.lean`.
+- **Lakefile**: Located at `lean_project/lakefile.lean`.
 - **Mathlib**: The project is set up to require `mathlib` from git.
