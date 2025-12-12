@@ -27,7 +27,7 @@ useSeoMeta({
           <template #header>
             <div class="flex items-center gap-3">
               <UIcon name="tabler:code" class="text-2xl text-info" />
-              <h3 class="text-xl font-semibold">Lean Editor</h3>
+              <h3 class="text-xl font-semibold">Editor</h3>
             </div>
           </template>
           
@@ -53,7 +53,7 @@ useSeoMeta({
           <template #header>
             <div class="flex items-center gap-3">
               <UIcon name="tabler:message-circle" class="text-2xl text-success" />
-              <h3 class="text-xl font-semibold">LLM Chat</h3>
+              <h3 class="text-xl font-semibold">Chat</h3>
             </div>
           </template>
 

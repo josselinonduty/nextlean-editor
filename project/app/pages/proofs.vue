@@ -60,9 +60,10 @@ const handleDelete = async (id: string) => {
   }
 }
 
-const handleLoadProof = () => {
-  if (selectedProof.value) {
-    navigateTo(`/editor?proofId=${selectedProof.value.id}&content=${encodeURIComponent(selectedProof.value.content)}`)
+const handleLoadProof = (proof?: SavedProof | null) => {
+  const target = proof || selectedProof.value
+  if (target) {
+    navigateTo(`/editor?proofId=${target.id}&content=${encodeURIComponent(target.content)}`)
   }
 }
 
@@ -90,7 +91,7 @@ const formatDate = (timestamp: number) => {
           </p>
         </div>
         <NuxtLink to="/editor">
-          <UButton icon="tabler:plus" size="lg" color="info">
+          <UButton icon="tabler:plus" size="md" color="primary">
             New Proof
           </UButton>
         </NuxtLink>
@@ -112,8 +113,8 @@ const formatDate = (timestamp: number) => {
             v-for="tag in allTags"
             :key="tag"
             :variant="selectedTag === tag ? 'solid' : 'soft'"
-            :color="selectedTag === tag ? 'info' : 'gray'"
-            size="sm"
+            :color="selectedTag === tag ? 'primary' : 'neutral'"
+            size="xs"
             @click="selectedTag = selectedTag === tag ? null : tag"
           >
             {{ tag }}
@@ -130,7 +131,7 @@ const formatDate = (timestamp: number) => {
     </div>
 
     <div v-if="loading" class="flex flex-col items-center justify-center py-16 space-y-4">
-      <UIcon name="tabler:loader-2" class="text-4xl animate-spin text-info" />
+      <UIcon name="tabler:loader-2" class="text-4xl animate-spin text-primary" />
       <p class="text-gray-600 dark:text-gray-400">Loading proofs...</p>
     </div>
 
@@ -144,7 +145,7 @@ const formatDate = (timestamp: number) => {
           </p>
         </div>
         <NuxtLink to="/editor">
-          <UButton icon="tabler:pencil" color="info" size="lg">
+          <UButton icon="tabler:pencil" color="primary" size="md">
             Go to Editor
           </UButton>
         </NuxtLink>
@@ -165,12 +166,13 @@ const formatDate = (timestamp: number) => {
       <UCard
         v-for="proof in filteredProofs"
         :key="proof.id"
-        class="hover:shadow-md transition-shadow cursor-pointer group"
+        class="hover:ring-2 hover:ring-primary-500/50 transition-all cursor-pointer group"
+        :ui="{ body: { padding: 'p-0 sm:p-0' }, header: { padding: 'p-4 sm:p-4' }, footer: { padding: 'p-3 sm:p-3' } }"
         @click="selectProof(proof)"
       >
         <template #header>
           <div class="space-y-1">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-info transition-colors">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary transition-colors">
               {{ proof.title }}
             </h3>
             <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -179,8 +181,8 @@ const formatDate = (timestamp: number) => {
           </div>
         </template>
 
-        <div class="space-y-3">
-          <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
+        <div class="p-4 space-y-3">
+          <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 font-mono bg-gray-50 dark:bg-gray-900/50 p-2 rounded">
             {{ proof.content.substring(0, 150) }}{{ proof.content.length > 150 ? '...' : '' }}
           </p>
 
@@ -188,17 +190,17 @@ const formatDate = (timestamp: number) => {
             <UBadge
               v-for="tag in proof.tags.slice(0, 3)"
               :key="tag"
-              variant="soft"
-              color="gray"
-              size="sm"
+              variant="subtle"
+              color="neutral"
+              size="xs"
             >
               {{ tag }}
             </UBadge>
             <UBadge
               v-if="proof.tags.length > 3"
-              variant="soft"
-              color="gray"
-              size="sm"
+              variant="subtle"
+              color="neutral"
+              size="xs"
             >
               +{{ proof.tags.length - 3 }}
             </UBadge>
@@ -208,16 +210,16 @@ const formatDate = (timestamp: number) => {
         <template #footer>
           <div class="flex gap-2 justify-end">
             <UButton
-              color="info"
+              color="primary"
               variant="ghost"
               size="xs"
               icon="tabler:pencil"
-              @click.stop="handleLoadProof(); closeModal()"
+              @click.stop="handleLoadProof(proof)"
             >
               Edit
             </UButton>
             <UButton
-              color="gray"
+              color="neutral"
               variant="ghost"
               size="xs"
               icon="tabler:chevron-right"
@@ -230,63 +232,68 @@ const formatDate = (timestamp: number) => {
       </UCard>
     </div>
 
-    <USlideover v-model="showModal" @close="closeModal" side="right">
-      <div v-if="selectedProof" class="p-6 space-y-6">
-        <div class="flex items-center justify-between">
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-            {{ selectedProof.title }}
-          </h2>
-          <UButton color="gray" variant="ghost" icon="tabler:x" size="md" @click="closeModal" />
-        </div>
+    <USlideover v-model:open="showModal" title="Proof Details" side="right">
+      <template #content>
+        <div v-if="selectedProof" class="flex flex-col h-full">
+          <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">
+              {{ selectedProof.title }}
+            </h2>
+            <UButton color="neutral" variant="ghost" icon="tabler:x" size="sm" @click="closeModal" />
+          </div>
 
-        <div class="space-y-2">
-          <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Last Updated</p>
-          <p class="text-sm text-gray-700 dark:text-gray-300">
-            {{ formatDate(selectedProof.updatedAt) }}
-          </p>
-        </div>
+          <div class="flex-1 overflow-y-auto p-4 space-y-6">
+            <div class="space-y-2">
+              <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Last Updated</p>
+              <p class="text-sm text-gray-700 dark:text-gray-300">
+                {{ formatDate(selectedProof.updatedAt) }}
+              </p>
+            </div>
 
-        <div v-if="selectedProof.tags && selectedProof.tags.length > 0" class="space-y-3">
-          <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Tags</p>
-          <div class="flex flex-wrap gap-2">
-            <UBadge
-              v-for="tag in selectedProof.tags"
-              :key="tag"
-              variant="soft"
-              color="info"
-              size="sm"
+            <div v-if="selectedProof.tags && selectedProof.tags.length > 0" class="space-y-3">
+              <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Tags</p>
+              <div class="flex flex-wrap gap-2">
+                <UBadge
+                  v-for="tag in selectedProof.tags"
+                  :key="tag"
+                  variant="subtle"
+                  color="primary"
+                  size="xs"
+                >
+                  {{ tag }}
+                </UBadge>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Content</p>
+              <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800 max-h-96 overflow-y-auto">
+                <pre class="text-sm font-mono text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">{{ selectedProof.content }}</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 border-t border-gray-200 dark:border-gray-800 flex gap-2">
+            <UButton
+              block
+              class="flex-1"
+              color="primary"
+              icon="tabler:edit"
+              @click="handleLoadProof(selectedProof)"
             >
-              {{ tag }}
-            </UBadge>
+              Open in Editor
+            </UButton>
+            <UButton
+              color="error"
+              variant="soft"
+              icon="tabler:trash"
+              @click="handleDelete(selectedProof.id)"
+            >
+              Delete
+            </UButton>
           </div>
         </div>
-
-        <div class="space-y-2">
-          <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Content</p>
-          <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800 max-h-96 overflow-y-auto">
-            <pre class="text-sm font-mono text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">{{ selectedProof.content }}</pre>
-          </div>
-        </div>
-
-        <div class="flex gap-2 pt-4 border-t border-gray-200 dark:border-gray-800">
-          <UButton
-            block
-            color="info"
-            icon="tabler:edit"
-            @click="handleLoadProof()"
-          >
-            Open in Editor
-          </UButton>
-          <UButton
-            color="red"
-            variant="soft"
-            icon="tabler:trash"
-            @click="handleDelete(selectedProof.id)"
-          >
-            Delete
-          </UButton>
-        </div>
-      </div>
+      </template>
     </USlideover>
   </div>
 </template>

@@ -3,7 +3,7 @@ import type { SavedProof } from '#shared/types'
 import type { Diagnostic } from '#shared/types/lsp'
 
 useSeoMeta({
-  title: 'Lean Editor - NextLean'
+  title: 'Editor - NextLean'
 })
 
 const route = useRoute()
@@ -498,7 +498,7 @@ const saveFile = () => {
   isModified.value = false
 }
 
-const saveProofToDatabase = async () => {
+const handleSaveProof = async () => {
   if (!proofTitle.value.trim()) {
     toast.add({
       title: 'Missing title',

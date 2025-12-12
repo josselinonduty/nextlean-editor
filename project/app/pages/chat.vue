@@ -1,6 +1,6 @@
 <script setup lang="ts">
 useSeoMeta({
-  title: "LLM Chat - NextLean",
+  title: "Chat - NextLean",
 });
 </script>
 
@@ -8,7 +8,7 @@ useSeoMeta({
   <div class="flex flex-col h-full overflow-hidden">
     <div class="flex-none p-6 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
       <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-        LLM Chat
+        Chat
       </h1>
       <p class="mt-1 text-gray-600 dark:text-gray-400">
         Collaborate with the NextLean assistant to explore Lean tactics, translate natural language descriptions, and connect with saved proofs.

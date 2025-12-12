@@ -15,12 +15,12 @@ const pageTitle = computed(() => {
 // Navigation items for the main menu
 const navigationItems: NavigationMenuItem[][] = [[
   {
-    label: 'Lean Editor',
+    label: 'Editor',
     icon: 'tabler:code',
     to: '/editor'
   },
   {
-    label: 'LLM Chat',
+    label: 'Chat',
     icon: 'tabler:message-circle',
     to: '/chat'
   },
