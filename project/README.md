@@ -28,7 +28,15 @@ NextLean bridges the gap between formal theorem proving and artificial intellige
     pnpm install
     ```
 
-3.  Initialize the Lean project (if not already done):
+3.  Configure environment variables:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Edit the `.env` file to set your OpenRouter API key and other configurations as needed.
+
+4.  Initialize the Lean project (if not already done):
     The application expects a Lean project structure in `project/lean_project`. The server will attempt to spawn `lake` from this directory.
 
 ### Build

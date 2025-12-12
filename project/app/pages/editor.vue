@@ -16,9 +16,8 @@ const mainContainer = ref<HTMLElement>()
 
 const isLoading = ref(true)
 const { code } = useEditorState()
+const { settings, updateSettings } = useSettings()
 
-const fontSize = ref(14)
-const theme = ref('vs-dark')
 const fileName = ref('main.lean')
 const isModified = ref(false)
 const showInfoview = ref(true)
@@ -321,11 +320,11 @@ const initializeMonaco = async () => {
   editorInstance = monaco.editor.create(editorContainer.value, {
     value: code.value,
     language: 'lean4',
-    theme: theme.value,
-    fontSize: fontSize.value,
-    wordWrap: 'on',
-    minimap: { enabled: true },
-    lineNumbers: 'on',
+    theme: settings.value.editorTheme,
+    fontSize: settings.value.editorFontSize,
+    wordWrap: settings.value.editorWordWrap ? 'on' : 'off',
+    minimap: { enabled: settings.value.editorMinimap },
+    lineNumbers: settings.value.editorLineNumbers ? 'on' : 'off',
     scrollBeyondLastLine: false,
     renderWhitespace: 'selection',
     tabSize: 2,
@@ -667,10 +666,11 @@ const loadProofFromDatabase = async () => {
 }
 
 const toggleTheme = async () => {
-  theme.value = theme.value === 'vs-dark' ? 'vs-light' : 'vs-dark'
+  const newTheme = settings.value.editorTheme === 'vs-dark' ? 'vs-light' : 'vs-dark'
+  updateSettings({ editorTheme: newTheme })
   if (editorInstance) {
     const monaco = await import('monaco-editor')
-    monaco.editor.setTheme(theme.value)
+    monaco.editor.setTheme(newTheme)
   }
 }
 
@@ -730,11 +730,18 @@ const stopResize = () => {
   }
 }
 
-watch(fontSize, (newSize) => {
+watch(settings, async (newSettings) => {
   if (editorInstance) {
-    editorInstance.updateOptions({ fontSize: newSize })
+    const monaco = await import('monaco-editor')
+    editorInstance.updateOptions({
+      fontSize: newSettings.editorFontSize,
+      wordWrap: newSettings.editorWordWrap ? 'on' : 'off',
+      minimap: { enabled: newSettings.editorMinimap },
+      lineNumbers: newSettings.editorLineNumbers ? 'on' : 'off'
+    })
+    monaco.editor.setTheme(newSettings.editorTheme)
   }
-})
+}, { deep: true })
 
 watch(showInfoview, () => {
   nextTick(() => {
@@ -840,7 +847,7 @@ watch(() => proofsError.value, (message) => {
         <UButton :icon="showInfoview ? 'tabler:layout-sidebar-right-filled' : 'tabler:layout-sidebar-right'" size="xs"
           color="neutral" variant="ghost" @click="toggleInfoview" title="Toggle Infoview" />
 
-        <UButton :icon="theme === 'vs-dark' ? 'tabler:sun' : 'tabler:moon'" size="xs" color="neutral" variant="ghost"
+        <UButton :icon="settings.editorTheme === 'vs-dark' ? 'tabler:sun' : 'tabler:moon'" size="xs" color="neutral" variant="ghost"
           @click="toggleTheme" title="Toggle Theme" />
 
         <div class="h-4 w-px bg-gray-300 dark:bg-gray-700 mx-1"></div>
@@ -1108,8 +1115,8 @@ watch(() => proofsError.value, (message) => {
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-2">
           <UIcon name="tabler:text-size" class="w-3 h-3 text-gray-500" />
-          <USlider v-model="fontSize" :min="10" :max="24" :step="1" class="w-20" />
-          <span class="text-gray-600 dark:text-gray-400 w-6">{{ fontSize }}px</span>
+          <USlider v-model="settings.editorFontSize" :min="10" :max="24" :step="1" class="w-20" />
+          <span class="text-gray-600 dark:text-gray-400 w-6">{{ settings.editorFontSize }}px</span>
         </div>
       </div>
     </div>
