@@ -69,6 +69,7 @@ The application will be available at `http://localhost:3000`.
 To preview the production build locally:
 
 ```bash
+cp -r lean_project .output/project/
 pnpm preview
 ```
 

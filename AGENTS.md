@@ -15,14 +15,12 @@ NextLean is an app (user interface) that integrates a Lean (v4) editor and a LLM
 ## Technologies
 
 - TypeScript
-- Nuxt
-- NuxtUI Pro v4
+- Nuxt v4
+- Nuxt UI v4
 - Lean v4
-- Python (if needed)
 
 ## Constraints
 
-Everything must be written in project/ directory.
 Follow Nuxt v4 guidelines:
 
 - app/ directory for client-side stuff (pages, components, composables, layouts, middleware, plugins, etc.)
