@@ -39,6 +39,11 @@ NextLean bridges the gap between formal theorem proving and artificial intellige
 4.  Initialize the Lean project (if not already done):
     The application expects a Lean project structure in `project/lean_project`. The server will attempt to spawn `lake` from this directory.
 
+    ```bash
+    cd project/lean_project
+    lake build
+    ```
+
 ### Build
 
 To build the application for production:
