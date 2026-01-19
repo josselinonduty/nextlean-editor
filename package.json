@@ -36,8 +36,10 @@
   },
   "devDependencies": {
     "@codingame/esbuild-import-meta-url-plugin": "^1.0.3",
+    "@tailwindcss/vite": "^4.1.18",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "22.19.2",
-    "baseline-browser-mapping": "^2.9.6"
+    "baseline-browser-mapping": "^2.9.6",
+    "tailwindcss": "^4.1.18"
   }
 }

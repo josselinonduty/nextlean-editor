@@ -1,0 +1,13 @@
+services:
+  nextlean:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./lean_project:/home/node/app/lean_project
+      - ./data:/home/node/app/.output/.data
+    env_file:
+      - .env
+    environment:
+      - NUXT_HOST=0.0.0.0
+      - NUXT_PORT=3000
