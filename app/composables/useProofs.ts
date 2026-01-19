@@ -14,22 +14,36 @@ const normalizeTags = (tags?: string[]): string[] => {
   return Array.from(unique);
 };
 
-const parseJSON = async (response: Response) => {
+const parseJSON = async <T>(response: Response): Promise<T | null> => {
   const text = await response.text();
   if (!text) return null;
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as T;
   } catch {
     throw new Error("Failed to parse server response");
   }
 };
 
-export const useProofs = () => {
+export interface UseProofsReturn {
+  proofs: Readonly<Ref<SavedProof[]>>;
+  loading: Readonly<Ref<boolean>>;
+  error: Readonly<Ref<string | null>>;
+  fetchProofs: () => Promise<void>;
+  getProof: (id: string) => Promise<SavedProof | null>;
+  createProof: (data: CreateProofRequest) => Promise<SavedProof | null>;
+  updateProof: (
+    id: string,
+    data: UpdateProofRequest,
+  ) => Promise<SavedProof | null>;
+  deleteProof: (id: string) => Promise<boolean>;
+}
+
+export const useProofs = (): UseProofsReturn => {
   const proofs = ref<SavedProof[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
 
-  const fetchProofs = async () => {
+  const fetchProofs = async (): Promise<void> => {
     loading.value = true;
     error.value = null;
     try {
@@ -37,7 +51,7 @@ export const useProofs = () => {
       if (!response.ok) {
         throw new Error(`Failed to fetch proofs: ${response.statusText}`);
       }
-      const data = await parseJSON(response);
+      const data = await parseJSON<SavedProof[]>(response);
       proofs.value = Array.isArray(data) ? data : [];
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Unknown error";
@@ -56,8 +70,7 @@ export const useProofs = () => {
         if (response.status === 404) return null;
         throw new Error(`Failed to fetch proof: ${response.statusText}`);
       }
-      const data = await parseJSON(response);
-      return data as SavedProof;
+      return await parseJSON<SavedProof>(response);
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Unknown error";
       return null;
@@ -67,7 +80,7 @@ export const useProofs = () => {
   };
 
   const createProof = async (
-    data: CreateProofRequest
+    data: CreateProofRequest,
   ): Promise<SavedProof | null> => {
     loading.value = true;
     error.value = null;
@@ -85,7 +98,7 @@ export const useProofs = () => {
       if (!response.ok) {
         throw new Error(`Failed to create proof: ${response.statusText}`);
       }
-      const created = (await parseJSON(response)) as SavedProof | null;
+      const created = await parseJSON<SavedProof>(response);
       if (created) {
         proofs.value = [
           created,
@@ -103,7 +116,7 @@ export const useProofs = () => {
 
   const updateProof = async (
     id: string,
-    data: UpdateProofRequest
+    data: UpdateProofRequest,
   ): Promise<SavedProof | null> => {
     loading.value = true;
     error.value = null;
@@ -120,7 +133,7 @@ export const useProofs = () => {
       if (!response.ok) {
         throw new Error(`Failed to update proof: ${response.statusText}`);
       }
-      const updated = (await parseJSON(response)) as SavedProof | null;
+      const updated = await parseJSON<SavedProof>(response);
       if (updated) {
         proofs.value = [updated, ...proofs.value.filter((p) => p.id !== id)];
       }

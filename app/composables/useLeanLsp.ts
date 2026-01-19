@@ -6,16 +6,53 @@ import type {
   PublishDiagnosticsParams,
 } from "#shared/types/lsp";
 import type { JsonRpcMessage } from "#shared/types/jsonrpc";
-import { useLeanServer } from "./useLeanServer";
+import type {
+  LeanHoverResult,
+  LeanCompletionResult,
+  LeanDefinitionResponse,
+} from "#shared/types/lean";
+import { useLeanServer, type UseLeanServerReturn } from "./useLeanServer";
 
-export function useLeanLsp() {
+export interface UseLeanLspReturn extends UseLeanServerReturn {
+  diagnostics: Ref<PublishDiagnosticsParams[]>;
+  setupDiagnosticsListener: () => () => void;
+  openTextDocument: (
+    uri: string,
+    languageId: string,
+    version: number,
+    text: string,
+  ) => void;
+  changeTextDocument: (
+    uri: string,
+    version: number,
+    changes: TextDocumentContentChangeEvent[],
+  ) => void;
+  closeTextDocument: (uri: string) => void;
+  getHover: (
+    uri: string,
+    line: number,
+    character: number,
+  ) => Promise<LeanHoverResult | null>;
+  getCompletion: (
+    uri: string,
+    line: number,
+    character: number,
+  ) => Promise<LeanCompletionResult | null>;
+  getDefinition: (
+    uri: string,
+    line: number,
+    character: number,
+  ) => Promise<LeanDefinitionResponse>;
+}
+
+export function useLeanLsp(): UseLeanLspReturn {
   const leanServer = useLeanServer();
   const diagnostics = useState<PublishDiagnosticsParams[]>(
     "lean-diagnostics",
-    () => []
+    () => [],
   );
 
-  function setupDiagnosticsListener() {
+  function setupDiagnosticsListener(): () => void {
     return leanServer.onMessage((message: JsonRpcMessage) => {
       if (
         "method" in message &&
@@ -27,12 +64,12 @@ export function useLeanLsp() {
     });
   }
 
-  async function openTextDocument(
+  function openTextDocument(
     uri: string,
     languageId: string,
     version: number,
-    text: string
-  ) {
+    text: string,
+  ): void {
     const params: DidOpenTextDocumentParams = {
       textDocument: {
         uri,
@@ -45,11 +82,11 @@ export function useLeanLsp() {
     leanServer.sendNotification("textDocument/didOpen", params);
   }
 
-  async function changeTextDocument(
+  function changeTextDocument(
     uri: string,
     version: number,
-    changes: TextDocumentContentChangeEvent[]
-  ) {
+    changes: TextDocumentContentChangeEvent[],
+  ): void {
     const params: DidChangeTextDocumentParams = {
       textDocument: {
         uri,
@@ -61,7 +98,7 @@ export function useLeanLsp() {
     leanServer.sendNotification("textDocument/didChange", params);
   }
 
-  async function closeTextDocument(uri: string) {
+  function closeTextDocument(uri: string): void {
     const params: DidCloseTextDocumentParams = {
       textDocument: { uri },
     };
@@ -69,25 +106,46 @@ export function useLeanLsp() {
     leanServer.sendNotification("textDocument/didClose", params);
   }
 
-  async function getHover(uri: string, line: number, character: number) {
-    return await leanServer.sendRequest("textDocument/hover", {
-      textDocument: { uri },
-      position: { line, character },
-    });
+  async function getHover(
+    uri: string,
+    line: number,
+    character: number,
+  ): Promise<LeanHoverResult | null> {
+    return await leanServer.sendRequest<LeanHoverResult | null>(
+      "textDocument/hover",
+      {
+        textDocument: { uri },
+        position: { line, character },
+      },
+    );
   }
 
-  async function getCompletion(uri: string, line: number, character: number) {
-    return await leanServer.sendRequest("textDocument/completion", {
-      textDocument: { uri },
-      position: { line, character },
-    });
+  async function getCompletion(
+    uri: string,
+    line: number,
+    character: number,
+  ): Promise<LeanCompletionResult | null> {
+    return await leanServer.sendRequest<LeanCompletionResult | null>(
+      "textDocument/completion",
+      {
+        textDocument: { uri },
+        position: { line, character },
+      },
+    );
   }
 
-  async function getDefinition(uri: string, line: number, character: number) {
-    return await leanServer.sendRequest("textDocument/definition", {
-      textDocument: { uri },
-      position: { line, character },
-    });
+  async function getDefinition(
+    uri: string,
+    line: number,
+    character: number,
+  ): Promise<LeanDefinitionResponse> {
+    return await leanServer.sendRequest<LeanDefinitionResponse>(
+      "textDocument/definition",
+      {
+        textDocument: { uri },
+        position: { line, character },
+      },
+    );
   }
 
   return {

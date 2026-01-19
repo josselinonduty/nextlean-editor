@@ -1,18 +1,34 @@
 import type { JsonRpcMessage, JsonRpcRequest } from "#shared/types/jsonrpc";
+import type {
+  ConsoleMessage,
+  LeanServerReadyParams,
+  LeanServerStatusParams,
+} from "#shared/types/lean";
 
-export function useLeanServer() {
+export interface UseLeanServerReturn {
+  connected: Ref<boolean>;
+  ready: Ref<boolean>;
+  rootUri: Ref<string | null>;
+  serverStatus: Ref<string>;
+  consoleMessages: Ref<ConsoleMessage[]>;
+  connect: () => void;
+  disconnect: () => void;
+  sendRequest: <T = unknown>(
+    method: string,
+    params?: unknown,
+    timeoutMs?: number,
+  ) => Promise<T>;
+  sendNotification: (method: string, params?: unknown) => void;
+  onMessage: (handler: (message: JsonRpcMessage) => void) => () => void;
+}
+
+export function useLeanServer(): UseLeanServerReturn {
   const ws = ref<WebSocket>();
   const connected = ref(false);
   const ready = ref(false);
   const rootUri = ref<string | null>(null);
   const serverStatus = ref<string>("disconnected");
-  const consoleMessages = ref<
-    Array<{
-      message: string;
-      type: "info" | "error" | "success";
-      timestamp: number;
-    }>
-  >([]);
+  const consoleMessages = ref<ConsoleMessage[]>([]);
   const pendingRequests = new Map<
     string | number,
     {
@@ -22,7 +38,7 @@ export function useLeanServer() {
   >();
   const messageHandlers = new Set<(message: JsonRpcMessage) => void>();
 
-  function connect() {
+  function connect(): void {
     const protocol = globalThis.location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${protocol}//${globalThis.location.host}/api/ws`;
 
@@ -40,7 +56,7 @@ export function useLeanServer() {
         if ("method" in message && message.method === "$/serverReady") {
           ready.value = true;
           serverStatus.value = "ready";
-          const params = message.params as { rootUri?: string };
+          const params = message.params as LeanServerReadyParams | undefined;
           if (params?.rootUri) {
             rootUri.value = params.rootUri;
           }
@@ -48,10 +64,7 @@ export function useLeanServer() {
         }
 
         if ("method" in message && message.method === "$/serverStatus") {
-          const params = message.params as {
-            message: string;
-            type: "info" | "error" | "success";
-          };
+          const params = message.params as LeanServerStatusParams;
           serverStatus.value = params.message;
           consoleMessages.value.push({
             message: params.message,
@@ -87,17 +100,16 @@ export function useLeanServer() {
       serverStatus.value = "disconnected";
     };
 
-    ws.value.onerror = () => {
-      // Silent fail on connection errors
+    ws.value.onerror = (): void => {
       serverStatus.value = "error";
     };
   }
 
-  async function sendRequest(
+  async function sendRequest<T = unknown>(
     method: string,
     params?: unknown,
-    timeoutMs: number = 30000
-  ): Promise<unknown> {
+    timeoutMs: number = 30000,
+  ): Promise<T> {
     if (!ws.value || !connected.value) {
       throw new Error("Not connected to Lean server");
     }
@@ -114,8 +126,11 @@ export function useLeanServer() {
       params,
     };
 
-    return new Promise((resolve, reject) => {
-      pendingRequests.set(id, { resolve, reject });
+    return new Promise<T>((resolve, reject) => {
+      pendingRequests.set(id, {
+        resolve: resolve as (value: unknown) => void,
+        reject,
+      });
       ws.value!.send(JSON.stringify(request));
 
       if (timeoutMs > 0) {

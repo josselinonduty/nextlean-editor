@@ -1,5 +1,4 @@
 export interface Settings {
-  // Editor
   editorFontSize: number;
   editorTheme: "vs-dark" | "vs-light";
   editorWordWrap: boolean;
@@ -7,7 +6,13 @@ export interface Settings {
   editorLineNumbers: boolean;
 }
 
-export const useSettings = () => {
+export interface UseSettingsReturn {
+  settings: Ref<Settings>;
+  updateSettings: (newSettings: Partial<Settings>) => void;
+  resetSettings: () => void;
+}
+
+export const useSettings = (): UseSettingsReturn => {
   const settings = useCookie<Settings>("nextlean-settings", {
     default: () => ({
       editorFontSize: 14,
@@ -28,17 +33,17 @@ export const useSettings = () => {
     (newTheme) => {
       colorMode.preference = newTheme === "vs-dark" ? "dark" : "light";
     },
-    { immediate: true }
+    { immediate: true },
   );
 
-  const updateSettings = (newSettings: Partial<Settings>) => {
+  const updateSettings = (newSettings: Partial<Settings>): void => {
     settings.value = {
       ...settings.value,
       ...newSettings,
     };
   };
 
-  const resetSettings = () => {
+  const resetSettings = (): void => {
     settings.value = {
       editorFontSize: 14,
       editorTheme: "vs-dark",

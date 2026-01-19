@@ -4,8 +4,8 @@ import {
   mapProofRow,
   normalizeIncomingTags,
   serializeTags,
-  type ProofRow,
 } from "#server/utils/proofs";
+import { safeValidateProofRow } from "#server/schemas/proof.schema";
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -38,18 +38,18 @@ export default defineEventHandler(async (event) => {
   const tagsValue = serializeTags(normalizedTags);
 
   db.prepare(
-    "INSERT INTO proofs (id, title, content, tags, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO proofs (id, title, content, tags, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
   ).run(id, title, content, tagsValue, now, now);
 
-  const created = db.prepare("SELECT * FROM proofs WHERE id = ?").get(id) as
-    | ProofRow
-    | undefined;
-  if (!created) {
+  const created = db.prepare("SELECT * FROM proofs WHERE id = ?").get(id);
+  const validation = safeValidateProofRow(created);
+  if (!validation.success) {
+    console.error("Database validation failed:", validation.error.message);
     throw createError({
       statusCode: 500,
       statusMessage: "Failed to load created proof",
     });
   }
 
-  return mapProofRow(created);
+  return mapProofRow(validation.data);
 });

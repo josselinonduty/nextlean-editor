@@ -19,6 +19,14 @@ import { appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import type { Diagnostic } from "#shared/types/lsp";
+import type {
+  ListProofsInput,
+  GetProofInput,
+  ReadEditorInput,
+  AddDependencyInput,
+  ToolCallResult,
+} from "#shared/types/tools";
 
 const execAsync = promisify(exec);
 
@@ -32,7 +40,7 @@ interface ChatMessageInput {
 interface ChatRequestBody {
   messages: ChatMessageInput[];
   editorContent?: string;
-  diagnostics?: unknown[];
+  diagnostics?: Diagnostic[];
 }
 
 const getTextContent = (value: unknown): string => {
@@ -75,7 +83,7 @@ const normalizeChatBody = (body: ChatRequestBody) => {
       (message) =>
         message &&
         typeof message.content === "string" &&
-        message.content.trim().length > 0
+        message.content.trim().length > 0,
     )
     .map((message) => ({
       role: (message.role === "assistant" || message.role === "system"
@@ -115,8 +123,8 @@ export default defineEventHandler(async (event) => {
   const db = await initializeDatabase();
 
   const listProofsTool = tool(
-    async (input) => {
-      const { query } = input as { query: string };
+    async (input: ListProofsInput) => {
+      const { query } = input;
       const rows = db
         .prepare("SELECT id, title, tags FROM proofs")
         .all() as Pick<ProofRow, "id" | "title" | "tags">[];
@@ -133,7 +141,7 @@ export default defineEventHandler(async (event) => {
       const filtered = results.filter(
         (r) =>
           r.title.toLowerCase().includes(lowerQuery) ||
-          r.tags.some((t) => t.toLowerCase().includes(lowerQuery))
+          r.tags.some((t) => t.toLowerCase().includes(lowerQuery)),
       );
       return JSON.stringify(filtered.slice(0, 10));
     },
@@ -145,15 +153,15 @@ export default defineEventHandler(async (event) => {
         query: z
           .string()
           .describe(
-            "Search query to filter proofs. Pass an empty string to list all proofs."
+            "Search query to filter proofs. Pass an empty string to list all proofs.",
           ),
       }),
-    }
+    },
   );
 
   const getProofTool = tool(
-    async (input) => {
-      const { id } = input as { id: string };
+    async (input: GetProofInput) => {
+      const { id } = input;
       const proof = findProofById(db, id);
       if (!proof) return "Proof not found.";
       return JSON.stringify({
@@ -169,15 +177,12 @@ export default defineEventHandler(async (event) => {
       schema: z.object({
         id: z.string().describe("The ID of the proof to retrieve"),
       }),
-    }
+    },
   );
 
   const readEditorTool = tool(
-    async (input) => {
-      const { startLine, endLine } = input as {
-        startLine?: number;
-        endLine?: number;
-      };
+    async (input: ReadEditorInput) => {
+      const { startLine, endLine } = input;
       const lines = editorContent.split("\n");
 
       if (startLine === undefined && endLine === undefined) {
@@ -202,7 +207,7 @@ export default defineEventHandler(async (event) => {
           .describe("Start line number (1-based)"),
         endLine: z.number().optional().describe("End line number (1-based)"),
       }),
-    }
+    },
   );
 
   const editEditorTool = tool(
@@ -218,12 +223,12 @@ export default defineEventHandler(async (event) => {
         endLine: z.number().describe("End line number (1-based)"),
         newContent: z.string().describe("The new content to insert"),
       }),
-    }
+    },
   );
 
   const addDependencyTool = tool(
-    async (input) => {
-      const { name, url } = input as { name: string; url: string };
+    async (input: AddDependencyInput) => {
+      const { name, url } = input;
       const projectPath = join(process.cwd(), "lean_project");
       const lakefilePath = join(projectPath, "lakefile.lean");
 
@@ -254,8 +259,9 @@ export default defineEventHandler(async (event) => {
         });
 
         return `Dependency '${name}' added to lakefile.lean. 'lake update' started in background.`;
-      } catch (e: any) {
-        return `Failed to add dependency: ${e.message}`;
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : "Unknown error";
+        return `Failed to add dependency: ${errorMessage}`;
       }
     },
     {
@@ -265,7 +271,7 @@ export default defineEventHandler(async (event) => {
         name: z.string().describe("The name of the dependency (e.g., mathlib)"),
         url: z.string().describe("The git URL of the dependency"),
       }),
-    }
+    },
   );
 
   const getDiagnosticsTool = tool(
@@ -280,7 +286,7 @@ export default defineEventHandler(async (event) => {
       description:
         "Get the current diagnostics (errors, warnings, info) from the Lean editor.",
       schema: z.object({}),
-    }
+    },
   );
 
   const tools = [
@@ -333,13 +339,12 @@ When providing code solutions, ALWAYS try to apply them directly using the 'edit
   ];
 
   let reply = "";
-  const steps: Array<{ name: string; input: unknown; output: string }> = [];
+  const steps: ToolCallResult[] = [];
 
   try {
     let response = await chatModel.invoke(messages);
     messages.push(response);
 
-    // Tool execution loop
     let iterations = 0;
     const MAX_ITERATIONS = 5;
 
@@ -357,14 +362,14 @@ When providing code solutions, ALWAYS try to apply them directly using the 'edit
             new ToolMessage({
               tool_call_id: toolCall.id!,
               content: "Tool not found",
-            })
+            }),
           );
           continue;
         }
         const toolMessage = await selectedTool.invoke(toolCall);
 
         steps.push({
-          name: toolCall.name,
+          name: toolCall.name as ToolCallResult["name"],
           input: toolCall.args,
           output:
             typeof toolMessage.content === "string"
@@ -379,19 +384,24 @@ When providing code solutions, ALWAYS try to apply them directly using the 'edit
     }
 
     reply = getTextContent(response.content).trim();
-  } catch (error: any) {
+  } catch (error) {
     console.error("Chat error:", error);
-    if (error?.response?.data) {
-      console.error(
-        "Error response data:",
-        JSON.stringify(error.response.data, null, 2)
-      );
+    const errorObj = error as Record<string, unknown> | null;
+    if (errorObj?.response && typeof errorObj.response === "object") {
+      const responseData = (errorObj.response as Record<string, unknown>).data;
+      if (responseData) {
+        console.error(
+          "Error response data:",
+          JSON.stringify(responseData, null, 2),
+        );
+      }
     }
     const detail = (() => {
       if (!error || typeof error !== "object") return null;
-      const asAny = error as Record<string, unknown>;
-      if (typeof asAny.message === "string") {
-        return asAny.message;
+      if (error instanceof Error) return error.message;
+      const asRecord = error as Record<string, unknown>;
+      if (typeof asRecord.message === "string") {
+        return asRecord.message;
       }
       return null;
     })();

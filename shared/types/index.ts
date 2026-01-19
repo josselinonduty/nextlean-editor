@@ -1,16 +1,10 @@
-export interface LeanProof {
+export interface BaseProof {
   id: string;
   title: string;
   content: string;
-  author: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
-export interface SavedProof {
-  id: string;
-  title: string;
-  content: string;
+export interface SavedProof extends BaseProof {
   tags: string[];
   createdAt: number;
   updatedAt: number;
@@ -76,3 +70,6 @@ export interface LeanAnalysis {
 
 export * from "./jsonrpc";
 export * from "./lsp";
+export * from "./monaco";
+export * from "./lean";
+export * from "./tools";

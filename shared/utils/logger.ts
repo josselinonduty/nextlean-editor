@@ -20,7 +20,7 @@ const COLORS = {
 
 function formatDirection(
   direction: "incoming" | "outgoing",
-  isServer: boolean
+  isServer: boolean,
 ): string {
   if (isServer) {
     return direction === "incoming"
@@ -33,7 +33,14 @@ function formatDirection(
   }
 }
 
-function truncateMessage(message: any, maxLength: number = 500): string {
+interface ParsedMessage {
+  method?: string;
+  id?: number;
+  result?: unknown;
+  error?: { message: string };
+}
+
+function truncateMessage(message: unknown, maxLength: number = 500): string {
   const str =
     typeof message === "string" ? message : JSON.stringify(message, null, 2);
   if (str.length <= maxLength) {
@@ -44,14 +51,17 @@ function truncateMessage(message: any, maxLength: number = 500): string {
   } chars total)${COLORS.reset}`;
 }
 
-function parseMessage(message: any): {
-  parsed: any;
+function parseMessage(message: unknown): {
+  parsed: ParsedMessage;
   type: string;
   method?: string;
   id?: number;
 } {
   try {
-    const parsed = typeof message === "string" ? JSON.parse(message) : message;
+    const parsed: ParsedMessage =
+      typeof message === "string"
+        ? JSON.parse(message)
+        : (message as ParsedMessage);
 
     let type = "unknown";
     if (parsed.method && parsed.id !== undefined) {
@@ -70,13 +80,16 @@ function parseMessage(message: any): {
     };
   } catch {
     return {
-      parsed: message,
+      parsed: message as ParsedMessage,
       type: "raw",
     };
   }
 }
 
-export function logServerMessage(message: any, options: LogMessageOptions) {
+export function logServerMessage(
+  message: unknown,
+  options: LogMessageOptions,
+): void {
   const { direction, peerId } = options;
   const { parsed, type, method } = parseMessage(message);
 
@@ -85,16 +98,19 @@ export function logServerMessage(message: any, options: LogMessageOptions) {
 
   if (type === "request" || type === "notification") {
     console.log(
-      `${directionStr}${peerStr} ${COLORS.yellow}${method}${COLORS.reset}`
+      `${directionStr}${peerStr} ${COLORS.yellow}${method}${COLORS.reset}`,
     );
   } else if (type === "response" && parsed.error) {
     console.error(
-      `${directionStr}${peerStr} ${COLORS.red}Error: ${parsed.error.message}${COLORS.reset}`
+      `${directionStr}${peerStr} ${COLORS.red}Error: ${parsed.error.message}${COLORS.reset}`,
     );
   }
 }
 
-export function logClientMessage(message: any, options: LogMessageOptions) {
+export function logClientMessage(
+  message: unknown,
+  options: LogMessageOptions,
+): void {
   const { direction } = options;
   const { parsed, type, method } = parseMessage(message);
 
@@ -106,13 +122,13 @@ export function logClientMessage(message: any, options: LogMessageOptions) {
     console.log(
       `%c${dirLabel} %c${method}`,
       `font-weight: bold; color: ${color}`,
-      "font-weight: bold"
+      "font-weight: bold",
     );
   } else if (type === "response" && parsed.error) {
     console.error(
       `%c${dirLabel} Error: %c${parsed.error.message}`,
       `color: #ef4444; font-weight: bold`,
-      "color: #ef4444"
+      "color: #ef4444",
     );
   }
 }

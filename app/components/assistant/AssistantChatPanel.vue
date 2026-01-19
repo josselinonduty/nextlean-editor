@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { marked } from "marked";
+import type { ToolCallResult, EditEditorInput } from "#shared/types/tools";
+import type { AssistantMessage } from "~/composables/useChat";
 
 interface PayloadMessage {
   role: "user" | "assistant";
@@ -41,7 +43,7 @@ watch(draft, () => {
   }
 });
 
-const extractText = (message: AssistantMessage) =>
+const extractText = (message: AssistantMessage): string =>
   message.parts
     .filter((part) => part.type === "text")
     .map((part) => part.text)
@@ -53,17 +55,16 @@ const buildPayload = (): PayloadMessage[] =>
     content: extractText(message),
   }));
 
-const sendPayload = async (payload: PayloadMessage[]) => {
+const sendPayload = async (payload: PayloadMessage[]): Promise<void> => {
   lastPayload.value = payload;
   status.value = "submitted";
   
-  // Get latest diagnostics
   const currentDiagnostics = diagnostics.value.length > 0 ? diagnostics.value[diagnostics.value.length - 1]?.diagnostics : [];
 
   try {
     const response = await $fetch<{
       message: string;
-      steps?: ChatToolCall[];
+      steps?: ToolCallResult[];
     }>("/api/chat", {
       method: "POST",
       body: {
@@ -77,21 +78,12 @@ const sendPayload = async (payload: PayloadMessage[]) => {
       for (const step of response.steps) {
         if (step.name === "edit_editor") {
           try {
-            const args = step.input as { startLine: number; endLine: number; newContent: string };
+            const args = step.input as EditEditorInput;
             const lines = code.value.split("\n");
-            // 1-based indexing
             const start = Math.max(0, args.startLine - 1);
             const end = Math.min(lines.length - 1, args.endLine - 1);
             
             if (start <= end) {
-              // If newContent has multiple lines, we should split it too?
-              // Or just insert it as a string?
-              // splice takes items.
-              // If newContent is "a\nb", we want to insert "a", "b".
-              // But code.value is a string joined by \n.
-              // So we can just replace the chunk.
-              
-              // Simpler approach:
               const before = lines.slice(0, start);
               const after = lines.slice(end + 1);
               const newLines = [

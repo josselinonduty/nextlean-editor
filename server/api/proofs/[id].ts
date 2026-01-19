@@ -1,16 +1,17 @@
 import type { H3Event } from "h3";
+import type { SavedProof } from "#shared/types";
 import { initializeDatabase } from "#server/db";
 import {
   findProofById,
   mapProofRow,
   normalizeIncomingTags,
   serializeTags,
-  type ProofRow,
 } from "#server/utils/proofs";
+import { safeValidateProofRow } from "#server/schemas/proof.schema";
 
 type ProofsDatabase = Awaited<ReturnType<typeof initializeDatabase>>;
 
-const handleGet = (db: ProofsDatabase, id: string) => {
+const handleGet = (db: ProofsDatabase, id: string): SavedProof => {
   const row = findProofById(db, id);
   if (!row) {
     throw createError({
@@ -21,7 +22,11 @@ const handleGet = (db: ProofsDatabase, id: string) => {
   return mapProofRow(row);
 };
 
-const handlePut = async (event: H3Event, db: ProofsDatabase, id: string) => {
+const handlePut = async (
+  event: H3Event,
+  db: ProofsDatabase,
+  id: string,
+): Promise<SavedProof> => {
   const body = await readBody(event);
   const existing = findProofById(db, id);
   if (!existing) {
@@ -47,20 +52,22 @@ const handlePut = async (event: H3Event, db: ProofsDatabase, id: string) => {
   }
 
   db.prepare(
-    "UPDATE proofs SET title = ?, content = ?, tags = ?, updatedAt = ? WHERE id = ?"
+    "UPDATE proofs SET title = ?, content = ?, tags = ?, updatedAt = ? WHERE id = ?",
   ).run(title, content, tagsValue, now, id);
 
-  const updated = findProofById(db, id) as ProofRow | undefined;
-  if (!updated) {
+  const updated = db.prepare("SELECT * FROM proofs WHERE id = ?").get(id);
+  const validation = safeValidateProofRow(updated);
+  if (!validation.success) {
+    console.error("Database validation failed:", validation.error.message);
     throw createError({
       statusCode: 500,
       statusMessage: "Failed to load updated proof",
     });
   }
-  return mapProofRow(updated);
+  return mapProofRow(validation.data);
 };
 
-const handleDelete = (db: ProofsDatabase, id: string) => {
+const handleDelete = (db: ProofsDatabase, id: string): { success: boolean } => {
   const result = db.prepare("DELETE FROM proofs WHERE id = ?").run(id);
   if (result.changes === 0) {
     throw createError({

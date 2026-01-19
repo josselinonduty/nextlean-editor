@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import type { SavedProof } from "#shared/types";
 
 export interface ProofRow {
@@ -13,10 +13,10 @@ export interface ProofRow {
 export const deserializeTags = (raw: string | null): string[] => {
   if (!raw) return [];
   try {
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       return parsed
-        .map((tag) => String(tag).trim())
+        .map((tag: unknown) => String(tag).trim())
         .filter((tag) => tag.length > 0);
     }
   } catch {}
@@ -35,20 +35,22 @@ export const normalizeIncomingTags = (input: unknown): string[] => {
   if (Array.isArray(input)) {
     return Array.from(
       new Set(
-        input.map((tag) => String(tag).trim()).filter((tag) => tag.length > 0)
-      )
+        input
+          .map((tag: unknown) => String(tag).trim())
+          .filter((tag) => tag.length > 0),
+      ),
     );
   }
   if (typeof input === "string") {
     try {
-      const parsed = JSON.parse(input);
+      const parsed: unknown = JSON.parse(input);
       if (Array.isArray(parsed)) {
         return Array.from(
           new Set(
             parsed
-              .map((tag) => String(tag).trim())
-              .filter((tag) => tag.length > 0)
-          )
+              .map((tag: unknown) => String(tag).trim())
+              .filter((tag) => tag.length > 0),
+          ),
         );
       }
     } catch {}
@@ -57,14 +59,25 @@ export const normalizeIncomingTags = (input: unknown): string[] => {
         input
           .split(",")
           .map((tag) => tag.trim())
-          .filter((tag) => tag.length > 0)
-      )
+          .filter((tag) => tag.length > 0),
+      ),
     );
   }
   return [];
 };
 
-export const mapProofRow = (row: ProofRow): SavedProof => ({
+export const mapProofRow = (
+  row:
+    | ProofRow
+    | {
+        id: string;
+        title: string;
+        content: string;
+        tags: string | null;
+        createdAt: number;
+        updatedAt: number;
+      },
+): SavedProof => ({
   id: row.id,
   title: row.title,
   content: row.content,
@@ -75,7 +88,7 @@ export const mapProofRow = (row: ProofRow): SavedProof => ({
 
 export const findProofById = (
   db: Database.Database,
-  id: string
+  id: string,
 ): ProofRow | undefined => {
   return db.prepare("SELECT * FROM proofs WHERE id = ?").get(id) as
     | ProofRow

@@ -1,4 +1,5 @@
 import type { ChatStatus } from "@nuxt/ui";
+import type { ToolCallResult } from "#shared/types/tools";
 
 export interface ChatMessagePart {
   id: string;
@@ -6,24 +7,26 @@ export interface ChatMessagePart {
   text: string;
 }
 
-export interface ChatToolCall {
-  name: string;
-  input: unknown;
-  output: string;
-}
-
 export interface AssistantMessage {
   id: string;
   role: "user" | "assistant";
   parts: ChatMessagePart[];
   createdAt: number;
-  toolCalls?: ChatToolCall[];
+  toolCalls?: ToolCallResult[];
 }
 
-export const useChat = () => {
+export interface UseChatReturn {
+  status: Ref<ChatStatus>;
+  messages: Ref<AssistantMessage[]>;
+  createId: () => string;
+  createPart: (text: string) => ChatMessagePart;
+  clearMessages: () => void;
+}
+
+export const useChat = (): UseChatReturn => {
   const status = useState<ChatStatus>("chat-status", () => "ready");
 
-  const createId = () => {
+  const createId = (): string => {
     if (
       typeof crypto !== "undefined" &&
       typeof crypto.randomUUID === "function"
@@ -51,7 +54,7 @@ export const useChat = () => {
     },
   ]);
 
-  const clearMessages = () => {
+  const clearMessages = (): void => {
     messages.value = [
       {
         id: createId(),

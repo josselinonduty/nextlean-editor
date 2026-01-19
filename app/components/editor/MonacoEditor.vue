@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { Diagnostic } from '#shared/types/lsp'
+import type { LeanHoverContents } from '#shared/types/lean'
+import type { MonacoEditorUpdateOptions } from '#shared/types/monaco'
 
 interface Props {
   modelValue: string
@@ -207,18 +209,18 @@ const initializeMonaco = async () => {
           props.documentUri,
           position.lineNumber - 1,
           position.column - 1
-        ) as { contents?: string | { value?: string; kind?: string } | Array<string | { value?: string }>, range?: { start: { line: number; character: number }, end: { line: number; character: number } } } | null
+        )
 
         if (result && result.contents) {
           let hoverText = ''
 
           if (typeof result.contents === 'string') {
             hoverText = result.contents
-          } else if ('value' in result.contents && result.contents.value) {
+          } else if (!Array.isArray(result.contents) && 'value' in result.contents && result.contents.value) {
             hoverText = result.contents.value
           } else if (Array.isArray(result.contents)) {
             hoverText = result.contents
-              .map((c) => (typeof c === 'string' ? c : c.value || ''))
+              .map((c) => (typeof c === 'string' ? c : (c as LeanHoverContents).value || ''))
               .join('\n\n')
           }
 
@@ -293,10 +295,10 @@ const updateOptions = async (options: {
   minimap?: boolean
   lineNumbers?: boolean
   theme?: string
-}) => {
+}): Promise<void> => {
   if (editorInstance) {
     const monaco = await import('monaco-editor')
-    const updateConfig: Record<string, unknown> = {
+    const updateConfig: MonacoEditorUpdateOptions = {
       fontSize: options.fontSize,
       wordWrap: options.wordWrap ? 'on' : 'off'
     }
