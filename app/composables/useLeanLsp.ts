@@ -10,6 +10,7 @@ import type {
   LeanHoverResult,
   LeanCompletionResult,
   LeanDefinitionResponse,
+  LeanPlainGoal,
 } from "#shared/types/lean";
 import { useLeanServer, type UseLeanServerReturn } from "./useLeanServer";
 
@@ -43,6 +44,12 @@ export interface UseLeanLspReturn extends UseLeanServerReturn {
     line: number,
     character: number,
   ) => Promise<LeanDefinitionResponse>;
+  getGoalState: (
+    uri: string,
+    line: number,
+    character: number,
+  ) => Promise<LeanPlainGoal | null>;
+  clearDiagnosticsForUri: (uri: string) => void;
 }
 
 export function useLeanLsp(): UseLeanLspReturn {
@@ -59,9 +66,23 @@ export function useLeanLsp(): UseLeanLspReturn {
         message.method === "textDocument/publishDiagnostics"
       ) {
         const params = message.params as PublishDiagnosticsParams;
-        diagnostics.value.push(params);
+        const existingIndex = diagnostics.value.findIndex(
+          (d) => d.uri === params.uri,
+        );
+        if (existingIndex >= 0) {
+          diagnostics.value[existingIndex] = params;
+        } else {
+          if (diagnostics.value.length >= 100) {
+            diagnostics.value.shift();
+          }
+          diagnostics.value.push(params);
+        }
       }
     });
+  }
+
+  function clearDiagnosticsForUri(uri: string): void {
+    diagnostics.value = diagnostics.value.filter((d) => d.uri !== uri);
   }
 
   function openTextDocument(
@@ -148,6 +169,20 @@ export function useLeanLsp(): UseLeanLspReturn {
     );
   }
 
+  async function getGoalState(
+    uri: string,
+    line: number,
+    character: number,
+  ): Promise<LeanPlainGoal | null> {
+    return await leanServer.sendRequest<LeanPlainGoal | null>(
+      "$/lean/plainGoal",
+      {
+        textDocument: { uri },
+        position: { line, character },
+      },
+    );
+  }
+
   return {
     ...leanServer,
     diagnostics,
@@ -158,5 +193,7 @@ export function useLeanLsp(): UseLeanLspReturn {
     getHover,
     getCompletion,
     getDefinition,
+    getGoalState,
+    clearDiagnosticsForUri,
   };
 }

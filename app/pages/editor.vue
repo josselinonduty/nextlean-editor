@@ -40,8 +40,10 @@ const leanDiagnostics = ref<Diagnostic[]>([])
 const leanGoals = ref<string | null>(null)
 const leanErrors = ref<Array<{ message: string; raw: unknown }>>([])
 const showErrorModal = ref(false)
+const cursorPosition = ref<{ lineNumber: number; column: number }>({ lineNumber: 1, column: 1 })
 
 let resizeAnimationFrame: number | null = null
+let goalUpdateTimeout: ReturnType<typeof setTimeout> | null = null
 
 const leanLsp = useLeanLsp()
 
@@ -88,6 +90,40 @@ const handleEditorReady = () => {
   leanLsp.connect()
 }
 
+const updateGoalState = async () => {
+  if (!leanLsp.ready.value || !editorDocument.value.isOpen) {
+    leanGoals.value = null
+    return
+  }
+
+  try {
+    const result = await leanLsp.getGoalState(
+      editorDocument.value.uri,
+      cursorPosition.value.lineNumber - 1,
+      cursorPosition.value.column - 1
+    )
+
+    if (result && result.goals && result.goals.length > 0) {
+      leanGoals.value = result.goals.join('\n\n')
+    } else if (result && result.rendered) {
+      leanGoals.value = result.rendered
+    } else {
+      leanGoals.value = null
+    }
+  } catch {
+    leanGoals.value = null
+  }
+}
+
+const debouncedUpdateGoals = () => {
+  if (goalUpdateTimeout) {
+    clearTimeout(goalUpdateTimeout)
+  }
+  goalUpdateTimeout = setTimeout(updateGoalState, 300)
+}
+
+watch(cursorPosition, debouncedUpdateGoals, { deep: true })
+
 const handleContentChange = () => {
   markModified()
   incrementVersion()
@@ -97,6 +133,12 @@ const handleContentChange = () => {
       text: code.value
     }])
   }
+
+  debouncedUpdateGoals()
+}
+
+const handleCursorChange = (position: { lineNumber: number; column: number }) => {
+  cursorPosition.value = position
 }
 
 const handleCodeUpdate = (newCode: string) => {
@@ -292,6 +334,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (editorDocument.value.isOpen && leanLsp.connected.value) {
+    leanLsp.clearDiagnosticsForUri(editorDocument.value.uri)
     leanLsp.closeTextDocument(editorDocument.value.uri)
   }
   leanLsp.disconnect()
@@ -300,6 +343,9 @@ onUnmounted(() => {
   document.body.style.cursor = ''
   if (resizeAnimationFrame) {
     cancelAnimationFrame(resizeAnimationFrame)
+  }
+  if (goalUpdateTimeout) {
+    clearTimeout(goalUpdateTimeout)
   }
 })
 </script>
@@ -402,6 +448,7 @@ onUnmounted(() => {
             :line-numbers="settings.editorLineNumbers"
             @update:model-value="handleCodeUpdate"
             @content-change="handleContentChange"
+            @cursor-change="handleCursorChange"
             @ready="handleEditorReady"
           />
           <template #fallback>

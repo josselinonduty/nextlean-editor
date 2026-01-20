@@ -2,11 +2,23 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import {
+  StreamMessageReader,
+  StreamMessageWriter,
+  type Message,
+  type NotificationMessage,
+  type RequestMessage,
+} from "vscode-jsonrpc/node";
 import type { JsonRpcMessage } from "#shared/types/jsonrpc";
 import { JsonRpcMessageHandler } from "./jsonrpc";
 
+const HEALTH_CHECK_INTERVAL_MS = 30000;
+const MAX_CONSECUTIVE_FAILURES = 3;
+
 export class LeanServerManager {
   private process?: ChildProcess;
+  private reader?: StreamMessageReader;
+  private writer?: StreamMessageWriter;
   private readonly messageHandler = new JsonRpcMessageHandler();
   private readonly pendingRequests = new Map<
     string | number,
@@ -18,6 +30,10 @@ export class LeanServerManager {
   private readonly messageCallbacks = new Set<
     (message: JsonRpcMessage) => void
   >();
+  private healthCheckInterval?: ReturnType<typeof setInterval>;
+  private consecutiveFailures = 0;
+  private currentWorkspaceUri?: string;
+  private isRestarting = false;
 
   async start(workspaceUri: string): Promise<void> {
     if (this.process) {
@@ -74,11 +90,15 @@ export class LeanServerManager {
       });
     });
 
-    this.process.stdout?.on("data", (data: Buffer) => {
-      const messages = this.messageHandler.parseMessages(data.toString());
-      for (const message of messages) {
-        this.handleMessage(message);
-      }
+    this.reader = new StreamMessageReader(this.process.stdout!);
+    this.writer = new StreamMessageWriter(this.process.stdin!);
+
+    this.reader.listen((message: Message) => {
+      this.handleMessage(message as JsonRpcMessage);
+    });
+
+    this.reader.onError((error) => {
+      console.error("[LeanServer] Reader error:", error);
     });
 
     this.process.stderr?.on("data", (data: Buffer) => {
@@ -106,10 +126,71 @@ export class LeanServerManager {
       type: "info",
     });
     await this.initialize(workspaceUri);
+    this.currentWorkspaceUri = workspaceUri;
+    this.startHealthCheck();
     this.notifyClient("$/serverStatus", {
       message: "Lean server ready",
       type: "success",
     });
+  }
+
+  private startHealthCheck(): void {
+    this.stopHealthCheck();
+    this.consecutiveFailures = 0;
+
+    this.healthCheckInterval = setInterval(() => {
+      if (!this.process || this.isRestarting) return;
+
+      if (this.process.exitCode !== null || this.process.killed) {
+        this.consecutiveFailures++;
+        console.warn(
+          `[LeanServer] Health check failed - process not running (${this.consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`,
+        );
+
+        if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          this.notifyClient("$/serverStatus", {
+            message: "Lean server not running, attempting restart...",
+            type: "error",
+          });
+
+          this.restart();
+        }
+        return;
+      }
+
+      this.consecutiveFailures = 0;
+    }, HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  private stopHealthCheck(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = undefined;
+    }
+  }
+
+  private async restart(): Promise<void> {
+    if (this.isRestarting || !this.currentWorkspaceUri) return;
+
+    this.isRestarting = true;
+    console.log("[LeanServer] Restarting server...");
+
+    try {
+      await this.stop();
+      await this.start(this.currentWorkspaceUri);
+      this.notifyClient("$/serverStatus", {
+        message: "Lean server restarted successfully",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("[LeanServer] Failed to restart:", error);
+      this.notifyClient("$/serverStatus", {
+        message: "Failed to restart Lean server",
+        type: "error",
+      });
+    } finally {
+      this.isRestarting = false;
+    }
   }
 
   private notifyClient(method: string, params?: unknown) {
@@ -166,7 +247,7 @@ export class LeanServerManager {
           },
         ],
       },
-      0
+      0,
     );
 
     console.log("Lean server initialized");
@@ -175,20 +256,24 @@ export class LeanServerManager {
 
   async sendRequest(
     method: string,
-    params?: unknown,
-    timeoutMs: number = 30000
+    params?: object | unknown[],
+    timeoutMs: number = 30000,
   ): Promise<unknown> {
-    if (!this.process?.stdin) {
+    if (!this.writer) {
       throw new Error("Lean server not running");
     }
 
     const id = Date.now();
-    const request = this.messageHandler.createRequest(method, params, id);
-    const encoded = this.messageHandler.encodeMessage(request);
+    const request: RequestMessage = {
+      jsonrpc: "2.0",
+      id,
+      method,
+      params,
+    };
 
     return new Promise((resolve, reject) => {
       this.pendingRequests.set(id, { resolve, reject });
-      this.process!.stdin!.write(encoded);
+      this.writer!.write(request);
 
       if (timeoutMs > 0) {
         setTimeout(() => {
@@ -201,14 +286,17 @@ export class LeanServerManager {
     });
   }
 
-  sendNotification(method: string, params?: unknown): void {
-    if (!this.process?.stdin) {
+  sendNotification(method: string, params?: object | unknown[]): void {
+    if (!this.writer) {
       throw new Error("Lean server not running");
     }
 
-    const notification = this.messageHandler.createNotification(method, params);
-    const encoded = this.messageHandler.encodeMessage(notification);
-    this.process.stdin.write(encoded);
+    const notification: NotificationMessage = {
+      jsonrpc: "2.0",
+      method,
+      params,
+    };
+    this.writer.write(notification);
   }
 
   onMessage(callback: (message: JsonRpcMessage) => void): () => void {
@@ -235,19 +323,28 @@ export class LeanServerManager {
   }
 
   private cleanup(): void {
+    this.stopHealthCheck();
+    this.reader?.dispose();
+    this.writer?.dispose();
+    this.reader = undefined;
+    this.writer = undefined;
     this.pendingRequests.clear();
     this.messageCallbacks.clear();
     this.process = undefined;
   }
 
   async stop(): Promise<void> {
+    this.stopHealthCheck();
     if (!this.process) return;
 
-    this.sendNotification("exit");
+    try {
+      this.sendNotification("exit");
+    } catch {}
 
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
         this.process?.kill("SIGKILL");
+        this.cleanup();
         resolve();
       }, 5000);
 

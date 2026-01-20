@@ -4,70 +4,8 @@ import type {
   JsonRpcResponse,
   JsonRpcError,
 } from "#shared/types/jsonrpc";
-import { serverLogger } from "#shared/utils/logger";
 
 export class JsonRpcMessageHandler {
-  private buffer = "";
-  private contentLength = 0;
-
-  parseMessages(data: string): JsonRpcMessage[] {
-    this.buffer += data;
-    const messages: JsonRpcMessage[] = [];
-
-    while (true) {
-      try {
-        if (this.contentLength === 0) {
-          const headerEnd = this.buffer.indexOf("\r\n\r\n");
-          if (headerEnd === -1) break;
-
-          const headers = this.buffer.slice(0, headerEnd);
-          const contentLengthRegex = /Content-Length: (\d+)/;
-          const contentLengthMatch = contentLengthRegex.exec(headers);
-
-          if (!contentLengthMatch) {
-            this.buffer = "";
-            this.contentLength = 0;
-            break;
-          }
-
-          this.contentLength = Number.parseInt(contentLengthMatch[1], 10);
-          this.buffer = this.buffer.slice(headerEnd + 4);
-        }
-
-        if (this.buffer.length < this.contentLength) break;
-
-        const messageStr = this.buffer.slice(0, this.contentLength);
-        this.buffer = this.buffer.slice(this.contentLength);
-        this.contentLength = 0;
-
-        try {
-          const message = JSON.parse(messageStr) as JsonRpcMessage;
-          messages.push(message);
-        } catch (error) {
-          serverLogger.error("JsonRpcMessageHandler.parseMessages", error, {
-            messageStr,
-          });
-          this.buffer = "";
-          this.contentLength = 0;
-          break;
-        }
-      } catch (error) {
-        serverLogger.error("JsonRpcMessageHandler.parseMessages.outer", error);
-        this.buffer = "";
-        this.contentLength = 0;
-        break;
-      }
-    }
-
-    return messages;
-  }
-
-  encodeMessage(message: JsonRpcMessage): string {
-    const content = JSON.stringify(message);
-    const contentLength = Buffer.byteLength(content, "utf8");
-    return `Content-Length: ${contentLength}\r\n\r\n${content}`;
-  }
-
   createRequest(
     method: string,
     params?: unknown,
