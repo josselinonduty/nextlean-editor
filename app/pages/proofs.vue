@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { SavedProof } from '#shared/types'
+import { clientLogger } from '#shared/utils/logger'
 
 useSeoMeta({
   title: 'Proofs - NextLean'
 })
 
+const toast = useToast()
 const { proofs, loading, error, fetchProofs, deleteProof } = useProofs()
 const selectedProof = ref<SavedProof | null>(null)
 const showModal = ref(false)
@@ -37,8 +39,17 @@ const allTags = computed(() => {
   return Array.from(tags).sort()
 })
 
-onMounted(() => {
-  fetchProofs()
+onMounted(async () => {
+  try {
+    await fetchProofs()
+  } catch (err) {
+    clientLogger.error('proofs.onMounted', err)
+    toast.add({
+      title: 'Failed to load proofs',
+      description: 'Could not fetch proofs from the server. Please try again.',
+      color: 'error'
+    })
+  }
 })
 
 const selectProof = (proof: SavedProof) => {
@@ -53,9 +64,23 @@ const closeModal = () => {
 
 const handleDelete = async (id: string) => {
   if (confirm('Are you sure you want to delete this proof?')) {
-    await deleteProof(id)
-    if (selectedProof.value?.id === id) {
-      closeModal()
+    try {
+      await deleteProof(id)
+      if (selectedProof.value?.id === id) {
+        closeModal()
+      }
+      toast.add({
+        title: 'Proof deleted',
+        description: 'The proof has been successfully deleted.',
+        color: 'success'
+      })
+    } catch (err) {
+      clientLogger.error('proofs.handleDelete', err)
+      toast.add({
+        title: 'Delete failed',
+        description: 'Could not delete the proof. Please try again.',
+        color: 'error'
+      })
     }
   }
 }

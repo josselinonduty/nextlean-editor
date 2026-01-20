@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SavedProof } from '#shared/types'
 import type { Diagnostic } from '#shared/types/lsp'
+import { clientLogger } from '#shared/utils/logger'
 
 useSeoMeta({
   title: 'Editor - NextLean'
@@ -121,7 +122,8 @@ const openFile = () => {
         monacoEditorRef.value?.setValue(content)
         fileName.value = file.name
         isModified.value = false
-      } catch {
+      } catch (error) {
+        clientLogger.error('editor.openFile', error, { fileName: file.name })
         toast.add({
           title: 'File read error',
           description: 'Unable to read the selected file.',
@@ -185,7 +187,8 @@ const loadProofFromDatabase = async () => {
       if (proof) {
         handleLoadProof(proof)
       }
-    } catch {
+    } catch (error) {
+      clientLogger.error('editor.loadProofFromDatabase', error, { proofId })
       toast.add({
         title: 'Unable to load proof',
         description: 'The requested proof could not be loaded from the server.',
@@ -272,8 +275,17 @@ watch(showInfoview, () => {
 
 onMounted(async () => {
   if (!import.meta.client) return
-  await nextTick()
-  await loadProofFromDatabase()
+  try {
+    await nextTick()
+    await loadProofFromDatabase()
+  } catch (error) {
+    clientLogger.error('editor.onMounted', error)
+    toast.add({
+      title: 'Initialization error',
+      description: 'Failed to initialize the editor. Please refresh the page.',
+      color: 'error'
+    })
+  }
 })
 
 onUnmounted(() => {

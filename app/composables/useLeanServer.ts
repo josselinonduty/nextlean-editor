@@ -4,6 +4,7 @@ import type {
   LeanServerReadyParams,
   LeanServerStatusParams,
 } from "#shared/types/lean";
+import { clientLogger } from "#shared/utils/logger";
 
 export interface UseLeanServerReturn {
   connected: Ref<boolean>;
@@ -89,8 +90,10 @@ export function useLeanServer(): UseLeanServerReturn {
         for (const handler of messageHandlers) {
           handler(message);
         }
-      } catch {
-        // Silent fail on parse errors
+      } catch (error) {
+        clientLogger.error("useLeanServer.parseMessage", error, {
+          rawData: event.data,
+        });
       }
     };
 

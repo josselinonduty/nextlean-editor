@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { SavedProof } from '#shared/types'
+import { clientLogger } from '#shared/utils/logger'
 
 interface ProofLike {
   id: string
@@ -104,7 +105,8 @@ const handleSaveProof = async () => {
       hasLoadedProofs.value = true
       emit('saved', result)
     }
-  } catch {
+  } catch (error) {
+    clientLogger.error('ProofLibrarySlideover.handleSave', error)
     toast.add({
       title: 'Save failed',
       description: 'An error occurred while saving the proof. Please try again.',
@@ -168,7 +170,8 @@ const copyProofContent = async (proof: ProofLike) => {
       description: 'Proof content copied to clipboard.',
       color: 'success'
     })
-  } catch {
+  } catch (error) {
+    clientLogger.error('ProofLibrarySlideover.copyProofContent', error)
     toast.add({
       title: 'Copy failed',
       description: 'Unable to copy proof content.',

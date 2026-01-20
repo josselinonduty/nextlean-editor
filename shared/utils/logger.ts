@@ -132,3 +132,44 @@ export function logClientMessage(
     );
   }
 }
+
+export const clientLogger = {
+  error: (context: string, error: unknown, extra?: Record<string, unknown>) => {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error(`[${context}]`, message, { ...extra, stack });
+  },
+  warn: (context: string, message: string, extra?: Record<string, unknown>) => {
+    console.warn(`[${context}]`, message, extra ?? {});
+  },
+  info: (context: string, message: string, extra?: Record<string, unknown>) => {
+    if (import.meta.dev) {
+      console.info(`[${context}]`, message, extra ?? {});
+    }
+  },
+};
+
+export const serverLogger = {
+  error: (context: string, error: unknown, extra?: Record<string, unknown>) => {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error(`${COLORS.red}[${context}]${COLORS.reset}`, message, {
+      ...extra,
+      stack,
+    });
+  },
+  warn: (context: string, message: string, extra?: Record<string, unknown>) => {
+    console.warn(
+      `${COLORS.yellow}[${context}]${COLORS.reset}`,
+      message,
+      extra ?? {},
+    );
+  },
+  info: (context: string, message: string, extra?: Record<string, unknown>) => {
+    console.info(
+      `${COLORS.cyan}[${context}]${COLORS.reset}`,
+      message,
+      extra ?? {},
+    );
+  },
+};

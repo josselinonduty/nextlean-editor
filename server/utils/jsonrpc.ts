@@ -4,6 +4,7 @@ import type {
   JsonRpcResponse,
   JsonRpcError,
 } from "#shared/types/jsonrpc";
+import { serverLogger } from "#shared/utils/logger";
 
 export class JsonRpcMessageHandler {
   private buffer = "";
@@ -42,12 +43,16 @@ export class JsonRpcMessageHandler {
         try {
           const message = JSON.parse(messageStr) as JsonRpcMessage;
           messages.push(message);
-        } catch {
+        } catch (error) {
+          serverLogger.error("JsonRpcMessageHandler.parseMessages", error, {
+            messageStr,
+          });
           this.buffer = "";
           this.contentLength = 0;
           break;
         }
-      } catch {
+      } catch (error) {
+        serverLogger.error("JsonRpcMessageHandler.parseMessages.outer", error);
         this.buffer = "";
         this.contentLength = 0;
         break;
@@ -66,7 +71,7 @@ export class JsonRpcMessageHandler {
   createRequest(
     method: string,
     params?: unknown,
-    id?: string | number
+    id?: string | number,
   ): JsonRpcRequest {
     return {
       jsonrpc: "2.0",
@@ -94,7 +99,7 @@ export class JsonRpcMessageHandler {
 
   createErrorResponse(
     id: string | number,
-    error: JsonRpcError
+    error: JsonRpcError,
   ): JsonRpcResponse {
     return {
       jsonrpc: "2.0",

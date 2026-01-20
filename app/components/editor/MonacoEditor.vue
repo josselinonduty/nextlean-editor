@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Diagnostic } from '#shared/types/lsp'
+import { clientLogger } from '#shared/utils/logger'
 import type { LeanHoverContents } from '#shared/types/lean'
 import type { MonacoEditorUpdateOptions } from '#shared/types/monaco'
 
@@ -238,7 +239,8 @@ const initializeMonaco = async () => {
             }
           }
         }
-      } catch {
+      } catch (error) {
+        clientLogger.warn('MonacoEditor.provideHover', 'Hover request failed', { error })
       }
 
       return null
@@ -351,7 +353,8 @@ onUnmounted(() => {
       editorInstance.dispose()
       editorInstance = null
     }
-  } catch {
+  } catch (error) {
+    clientLogger.error('MonacoEditor.onUnmounted', error)
   }
 })
 

@@ -3,6 +3,7 @@ import type {
   CreateProofRequest,
   UpdateProofRequest,
 } from "#shared/types";
+import { clientLogger } from "#shared/utils/logger";
 
 const normalizeTags = (tags?: string[]): string[] => {
   if (!tags) return [];
@@ -19,7 +20,10 @@ const parseJSON = async <T>(response: Response): Promise<T | null> => {
   if (!text) return null;
   try {
     return JSON.parse(text) as T;
-  } catch {
+  } catch (error) {
+    clientLogger.error("useProofs.parseJSON", error, {
+      responseText: text.slice(0, 200),
+    });
     throw new Error("Failed to parse server response");
   }
 };

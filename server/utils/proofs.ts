@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import type { SavedProof } from "#shared/types";
+import { serverLogger } from "#shared/utils/logger";
 
 export interface ProofRow {
   id: string;
@@ -19,7 +20,13 @@ export const deserializeTags = (raw: string | null): string[] => {
         .map((tag: unknown) => String(tag).trim())
         .filter((tag) => tag.length > 0);
     }
-  } catch {}
+  } catch (error) {
+    serverLogger.warn(
+      "proofs.deserializeTags",
+      "Failed to parse tags as JSON, falling back to comma split",
+      { raw, error },
+    );
+  }
   return raw
     .split(",")
     .map((tag) => tag.trim())
@@ -53,7 +60,13 @@ export const normalizeIncomingTags = (input: unknown): string[] => {
           ),
         );
       }
-    } catch {}
+    } catch (error) {
+      serverLogger.warn(
+        "proofs.normalizeIncomingTags",
+        "Failed to parse string as JSON, falling back to comma split",
+        { input, error },
+      );
+    }
     return Array.from(
       new Set(
         input
