@@ -112,3 +112,89 @@ export interface MonacoEditorUpdateOptions {
   minimap?: { enabled: boolean };
   lineNumbers?: "on" | "off" | "relative" | "interval";
 }
+
+export interface MonacoDisposable {
+  dispose(): void;
+}
+
+export interface MonacoTextModel {
+  getValue(): string;
+  setValue(value: string): void;
+  getLineCount(): number;
+  getLineContent(lineNumber: number): string;
+  getLineMaxColumn(lineNumber: number): number;
+  getValueInRange(range: MonacoRange): string;
+  getWordAtPosition(position: MonacoPosition): {
+    word: string;
+    startColumn: number;
+    endColumn: number;
+  } | null;
+  getWordUntilPosition(position: MonacoPosition): {
+    word: string;
+    startColumn: number;
+    endColumn: number;
+  };
+  uri: { toString(): string };
+  dispose(): void;
+}
+
+export interface MonacoDecorationsCollection {
+  set(decorations: MonacoDecoration[]): void;
+  clear(): void;
+}
+
+export interface MonacoEditorInstance {
+  getValue(): string;
+  setValue(value: string): void;
+  getPosition(): MonacoPosition | null;
+  setPosition(position: MonacoPosition): void;
+  getModel(): MonacoTextModel | null;
+  dispose(): void;
+  layout(dimension?: { width: number; height: number }): void;
+  updateOptions(options: MonacoEditorUpdateOptions): void;
+  focus(): void;
+  onDidChangeCursorPosition(
+    listener: (e: MonacoCursorPositionEvent) => void,
+  ): MonacoDisposable;
+  onDidChangeModelContent(
+    listener: (e: MonacoContentChangeEvent) => void,
+  ): MonacoDisposable;
+  onDidBlurEditorText(listener: () => void): MonacoDisposable;
+  createDecorationsCollection(
+    decorations: MonacoDecoration[],
+  ): MonacoDecorationsCollection;
+  executeEdits(
+    source: string,
+    edits: Array<{
+      range: MonacoRange;
+      text: string;
+    }>,
+  ): boolean;
+  getSelection(): MonacoRange | null;
+  setSelection(range: MonacoRange): void;
+  revealLine(lineNumber: number): void;
+  revealLineInCenter(lineNumber: number): void;
+}
+
+export interface MonacoHoverProvider {
+  provideHover(
+    model: MonacoTextModel,
+    position: MonacoPosition,
+  ): Promise<MonacoHoverResult | null>;
+}
+
+export interface MonacoCompletionProvider {
+  triggerCharacters?: string[];
+  provideCompletionItems(
+    model: MonacoTextModel,
+    position: MonacoPosition,
+  ): Promise<MonacoCompletionList>;
+}
+
+export const asTypedEditor = (editor: unknown): MonacoEditorInstance => {
+  return editor as MonacoEditorInstance;
+};
+
+export const asTypedModel = (model: unknown): MonacoTextModel => {
+  return model as MonacoTextModel;
+};

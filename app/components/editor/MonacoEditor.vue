@@ -43,8 +43,41 @@ const isLoading = ref(true)
 const currentEditingLine = ref<number | null>(null)
 
 let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | null = null
-let hoverProvider: { dispose(): void } | null = null
+let hoverProvider: import('monaco-editor').IDisposable | null = null
+let completionProvider: import('monaco-editor').IDisposable | null = null
 let decorationCollection: import('monaco-editor').editor.IEditorDecorationsCollection | null = null
+
+const convertCompletionKind = (kind: number | undefined, monacoKinds: typeof import('monaco-editor').languages.CompletionItemKind): import('monaco-editor').languages.CompletionItemKind => {
+  if (kind === undefined) return monacoKinds.Text
+  const kindMap: Record<number, import('monaco-editor').languages.CompletionItemKind> = {
+    1: monacoKinds.Text,
+    2: monacoKinds.Method,
+    3: monacoKinds.Function,
+    4: monacoKinds.Constructor,
+    5: monacoKinds.Field,
+    6: monacoKinds.Variable,
+    7: monacoKinds.Class,
+    8: monacoKinds.Interface,
+    9: monacoKinds.Module,
+    10: monacoKinds.Property,
+    11: monacoKinds.Unit,
+    12: monacoKinds.Value,
+    13: monacoKinds.Enum,
+    14: monacoKinds.Keyword,
+    15: monacoKinds.Snippet,
+    16: monacoKinds.Color,
+    17: monacoKinds.File,
+    18: monacoKinds.Reference,
+    19: monacoKinds.Folder,
+    20: monacoKinds.EnumMember,
+    21: monacoKinds.Constant,
+    22: monacoKinds.Struct,
+    23: monacoKinds.Event,
+    24: monacoKinds.Operator,
+    25: monacoKinds.TypeParameter
+  }
+  return kindMap[kind] ?? monacoKinds.Text
+}
 
 const updateEditorMarkers = async (diagnostics: Diagnostic[]) => {
   if (!editorInstance) return
@@ -196,7 +229,8 @@ const initializeMonaco = async () => {
       delay: 300,
       sticky: true
     },
-    quickSuggestions: false
+    quickSuggestions: true,
+    suggestOnTriggerCharacters: true
   })
 
   hoverProvider = monaco.languages.registerHoverProvider('lean4', {
@@ -244,6 +278,69 @@ const initializeMonaco = async () => {
       }
 
       return null
+    }
+  })
+
+  completionProvider = monaco.languages.registerCompletionItemProvider('lean4', {
+    triggerCharacters: ['.', '(', ' ', '#'],
+
+    provideCompletionItems: async (model, position) => {
+      if (!props.isDocumentOpen || !leanLsp.connected.value) {
+        return { suggestions: [] }
+      }
+
+      try {
+        const result = await leanLsp.getCompletion(
+          props.documentUri,
+          position.lineNumber - 1,
+          position.column - 1
+        )
+
+        if (!result?.items) {
+          return { suggestions: [] }
+        }
+
+        const wordInfo = model.getWordUntilPosition(position)
+        const range = {
+          startLineNumber: position.lineNumber,
+          startColumn: wordInfo.startColumn,
+          endLineNumber: position.lineNumber,
+          endColumn: position.column
+        }
+
+        const suggestions = result.items.map((item) => {
+          let documentation: string | undefined
+          if (item.documentation) {
+            if (typeof item.documentation === 'string') {
+              documentation = item.documentation
+            } else if ('value' in item.documentation) {
+              documentation = item.documentation.value
+            }
+          }
+
+          return {
+            label: item.label,
+            kind: convertCompletionKind(item.kind, monaco.languages.CompletionItemKind),
+            insertText: item.insertText || item.label,
+            insertTextRules: item.insertTextFormat === 2
+              ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+              : undefined,
+            detail: item.detail,
+            documentation,
+            sortText: item.sortText,
+            filterText: item.filterText,
+            range
+          }
+        })
+
+        return {
+          suggestions,
+          incomplete: result.isIncomplete
+        }
+      } catch (error) {
+        clientLogger.warn('MonacoEditor.provideCompletionItems', 'Completion request failed', { error })
+        return { suggestions: [] }
+      }
     }
   })
 
@@ -342,6 +439,11 @@ onUnmounted(() => {
     if (hoverProvider) {
       hoverProvider.dispose()
       hoverProvider = null
+    }
+
+    if (completionProvider) {
+      completionProvider.dispose()
+      completionProvider = null
     }
 
     if (decorationCollection) {

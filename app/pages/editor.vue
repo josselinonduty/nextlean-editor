@@ -334,7 +334,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (editorDocument.value.isOpen && leanLsp.connected.value) {
-    leanLsp.clearDiagnosticsForUri(editorDocument.value.uri)
     leanLsp.closeTextDocument(editorDocument.value.uri)
   }
   leanLsp.disconnect()

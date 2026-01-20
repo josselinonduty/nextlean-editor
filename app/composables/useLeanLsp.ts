@@ -120,6 +120,8 @@ export function useLeanLsp(): UseLeanLspReturn {
   }
 
   function closeTextDocument(uri: string): void {
+    clearDiagnosticsForUri(uri);
+
     const params: DidCloseTextDocumentParams = {
       textDocument: { uri },
     };
