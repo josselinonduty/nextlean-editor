@@ -1,119 +1,201 @@
 # NextLean
 
-NextLean is a modern web application that integrates a Lean 4 editor with an intelligent LLM agent. It is designed to assist users in writing, understanding, and generating mathematical proofs using the Lean theorem prover.
+NextLean is a modern web application that integrates a Lean 4 editor with an intelligent LLM agent. It assists users in writing, understanding, and generating mathematical proofs using the Lean theorem prover.
 
-## Description
+## Features
 
-NextLean bridges the gap between formal theorem proving and artificial intelligence. It provides a robust web-based editor for Lean 4, coupled with an AI assistant that can help with:
+- **Lean Editor**: Monaco-based code editor with Lean 4 syntax highlighting and real-time diagnostics
+- **AI Assistant**: LLM-powered chat that understands your code, suggests fixes, and generates proofs
+- **Proof Library**: Save, organize, and reuse your mathematical proofs
+- **Mathlib Support**: Full integration with the Mathlib library
 
-- Writing and editing Lean code.
-- Explaining mathematical concepts and Lean syntax.
-- Generating formal proofs based on natural language descriptions.
-- Diagnosing errors and suggesting fixes.
+---
 
-## Installation and Build
+## Quick Start (Docker)
+
+The easiest way to run NextLean is with Docker.
 
 ### Prerequisites
 
-- **Node.js**: Version 22 or higher.
-- **pnpm**: Package manager.
-- **Lean 4**: You need `elan` (the Lean version manager) installed and available in your path.
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- An [OpenRouter](https://openrouter.ai/) API key
 
-### Setup
+### Steps
 
-1.  Clone the repository.
-2.  Install dependencies:
+1. **Clone the repository**
 
-    ```bash
-    pnpm install
-    ```
+   ```bash
+   git clone https://github.com/josselinonduty/nextlean-editor.git
+   cd nextlean-editor
+   ```
 
-3.  Configure environment variables:
+2. **Configure environment variables**
 
-    ```bash
-    cp .env.example .env
-    ```
+   ```bash
+   cp .env.example .env
+   ```
 
-    Edit the `.env` file to set your OpenRouter API key and other configurations as needed.
+   Edit `.env` and set your OpenRouter API key:
 
-4.  Initialize the Lean project (if not already done):
-    The application expects a Lean project structure in `lean_project`. The server will attempt to spawn `lake` from this directory.
+   ```
+   NUXT_OPEN_ROUTER_API_KEY="your-openrouter-api-key-here"
+   ```
 
-    ```bash
-    cd lean_project
-    lake build
-    ```
+3. **Start the application**
 
-### Build
+   ```bash
+   docker compose up -d
+   ```
 
-To build the application for production:
+4. **Open your browser**
+
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+### Stopping the Application
 
 ```bash
-pnpm build
+docker compose down
 ```
 
-## Running
+### Viewing Logs
 
-### Development
+```bash
+docker compose logs -f
+```
 
-Start the development server:
+---
+
+## Advanced Setup (Source Build)
+
+For development or when you need more control over the environment.
+
+### Prerequisites
+
+- **Node.js**: Version 22 or higher
+- **pnpm**: Package manager (`corepack enable` to use)
+- **elan**: Lean version manager ([installation guide](https://leanprover.github.io/lean4/doc/setup.html))
+
+### Installation
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/josselinonduty/nextlean-editor.git
+   cd nextlean-editor
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   pnpm install
+   ```
+
+3. **Configure environment variables**
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env` and set your OpenRouter API key:
+
+   ```
+   NUXT_OPEN_ROUTER_API_KEY="your-openrouter-api-key-here"
+   ```
+
+4. **Build the Lean project** (first time only, may take a while)
+
+   ```bash
+   cd lean_project
+   lake build
+   cd ..
+   ```
+
+### Development Server
 
 ```bash
 pnpm dev
 ```
 
-The application will be available at `http://localhost:3000`.
+The application will be available at [http://localhost:3000](http://localhost:3000).
 
-### Production Preview
+### Production Build
 
-To preview the production build locally:
+```bash
+pnpm build
+```
+
+To run the production build:
 
 ```bash
 cp -r lean_project .output/
 pnpm preview
 ```
 
-## Features & Tools
+---
 
-- **Lean Editor**: A fully functional code editor based on Monaco Editor, configured for Lean 4 syntax highlighting and interaction.
-- **AI Assistant**: An integrated chat panel powered by LLMs (via OpenRouter/LangChain) that understands the context of your editor.
-  - **Context Awareness**: The AI can read the current editor content and diagnostics.
-  - **Active Editing**: The AI can directly modify the code in the editor to implement fixes or suggestions.
-  - **Proof Library**: Access to a library of saved proofs and examples.
-- **Lean Server Integration**:
-  - Runs a real Lean language server backend (`lake serve`).
-  - Provides real-time diagnostics (errors, warnings).
-  - Supports `Mathlib` and other dependencies.
-- **Proof Management**: Save, load, and organize your proofs.
+## Environment Variables
 
-## Development
+| Variable                   | Required | Description                                  |
+| -------------------------- | -------- | -------------------------------------------- |
+| `NUXT_OPEN_ROUTER_API_KEY` | Yes      | Your OpenRouter API key for the AI assistant |
 
-### Project Structure
+---
 
-The project follows the Nuxt 4 directory structure:
+## Project Structure
 
-- `app/`: Client-side application code.
-  - `components/`: Vue components (e.g., `AssistantChatPanel`, editor components).
-  - `pages/`: Application routes (`editor`, `chat`, `proofs`).
-  - `composables/`: Shared state and logic (e.g., `useLeanServer`, `useProofs`).
-- `server/`: Server-side logic.
-  - `api/`: API endpoints and WebSocket handler (`ws.ts`) for the Lean server.
-  - `utils/`: Server utilities, including the `LeanServerManager` and LangChain tools.
-- `shared/`: Code shared between client and server (types, constants).
-- `lean_project/`: The contained Lean 4 project environment.
+```
+nextlean/
+├── app/                    # Client-side application
+│   ├── components/         # Vue components
+│   ├── composables/        # Shared state and logic
+│   ├── layouts/            # Page layouts
+│   └── pages/              # Application routes
+├── server/                 # Server-side code
+│   ├── api/                # REST API and WebSocket endpoints
+│   ├── services/           # Business logic
+│   └── utils/              # Server utilities
+├── shared/                 # Shared client/server code
+├── lean_project/           # Lean 4 project environment
+└── docs/                   # Documentation
+```
 
-### Technologies
+---
 
-- **Frontend**: Nuxt 4, Vue 3, Nuxt UI v4, Tailwind CSS.
-- **Editor**: Monaco Editor.
-- **Backend**: Nitro (Nuxt server), Node.js.
-- **Lean Integration**: Custom WebSocket bridge to `lake serve` (Lean Language Server).
-- **AI/LLM**: LangChain, OpenRouter.
-- **Database**: SQLite (via `better-sqlite3`) for storing proofs.
+## Testing
 
-### Lean Environment
+```bash
+# Unit tests
+pnpm test
 
-The application runs a local instance of the Lean server. It is configured to work with `Mathlib`.
+# Unit tests with coverage
+pnpm test:coverage
 
-- **Lakefile**: Located at `lean_project/lakefile.lean`.
-- **Mathlib**: The project is set up to require `mathlib` from git.
+# End-to-end tests
+pnpm test:e2e
+```
+
+---
+
+## Documentation
+
+- [API Documentation](docs/api.md) - REST API and WebSocket protocol reference
+- [Architecture](docs/architecture.md) - System design and component overview
+- [Contributing](CONTRIBUTING.md) - Guidelines for contributors
+
+---
+
+## Technologies
+
+| Layer    | Technologies                            |
+| -------- | --------------------------------------- |
+| Frontend | Nuxt 4, Vue 3, Nuxt UI v4, Tailwind CSS |
+| Editor   | Monaco Editor                           |
+| Backend  | Nitro, Node.js, SQLite                  |
+| AI/LLM   | LangChain, OpenRouter                   |
+| Lean     | Lean 4, Lake, Mathlib                   |
+
+---
+
+## License
+
+See [LICENSE](LICENSE) for details.

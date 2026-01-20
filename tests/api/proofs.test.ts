@@ -40,13 +40,15 @@ vi.mock("#server/db", () => {
 });
 
 import {
-  deserializeTags,
-  serializeTags,
-  normalizeIncomingTags,
   mapProofRow,
   findProofById,
   type ProofRow,
 } from "#server/utils/proofs";
+import {
+  deserializeTags,
+  serializeTags,
+  normalizeTags,
+} from "#shared/utils/tags";
 import { initializeDatabase, closeDatabase } from "#server/db";
 
 const createProofRow = (overrides: Partial<ProofRow> = {}): ProofRow => ({
@@ -107,42 +109,36 @@ describe("Proofs Server Utilities", () => {
     });
   });
 
-  describe("normalizeIncomingTags", () => {
+  describe("normalizeTags", () => {
     it("should return empty array for null", () => {
-      expect(normalizeIncomingTags(null)).toEqual([]);
+      expect(normalizeTags(null)).toEqual([]);
     });
 
     it("should return empty array for undefined", () => {
-      expect(normalizeIncomingTags(undefined)).toEqual([]);
+      expect(normalizeTags(undefined)).toEqual([]);
     });
 
     it("should normalize array input", () => {
-      expect(normalizeIncomingTags(["tag1", "tag2"])).toEqual(["tag1", "tag2"]);
+      expect(normalizeTags(["tag1", "tag2"])).toEqual(["tag1", "tag2"]);
     });
 
     it("should deduplicate array input", () => {
-      expect(normalizeIncomingTags(["tag1", "tag1", "tag2"])).toEqual([
-        "tag1",
-        "tag2",
-      ]);
+      expect(normalizeTags(["tag1", "tag1", "tag2"])).toEqual(["tag1", "tag2"]);
     });
 
     it("should trim and filter array input", () => {
-      expect(normalizeIncomingTags(["  tag1  ", "", "  tag2  "])).toEqual([
+      expect(normalizeTags(["  tag1  ", "", "  tag2  "])).toEqual([
         "tag1",
         "tag2",
       ]);
     });
 
     it("should parse JSON string input", () => {
-      expect(normalizeIncomingTags('["tag1", "tag2"]')).toEqual([
-        "tag1",
-        "tag2",
-      ]);
+      expect(normalizeTags('["tag1", "tag2"]')).toEqual(["tag1", "tag2"]);
     });
 
     it("should fall back to comma split for non-JSON string", () => {
-      expect(normalizeIncomingTags("tag1, tag2, tag3")).toEqual([
+      expect(normalizeTags("tag1, tag2, tag3")).toEqual([
         "tag1",
         "tag2",
         "tag3",
@@ -150,15 +146,11 @@ describe("Proofs Server Utilities", () => {
     });
 
     it("should handle mixed types in array", () => {
-      expect(normalizeIncomingTags([1, "tag", "other"])).toEqual([
-        "1",
-        "tag",
-        "other",
-      ]);
+      expect(normalizeTags([1, "tag", "other"])).toEqual(["1", "tag", "other"]);
     });
 
     it("should convert null to string 'null'", () => {
-      expect(normalizeIncomingTags([null])).toEqual(["null"]);
+      expect(normalizeTags([null])).toEqual(["null"]);
     });
   });
 
