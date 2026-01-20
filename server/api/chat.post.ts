@@ -1,10 +1,7 @@
 import { useRuntimeConfig } from "#imports";
 import { initializeDatabase } from "#server/db";
-import {
-  deserializeTags,
-  findProofById,
-  type ProofRow,
-} from "#server/utils/proofs";
+import { findProofById, type ProofRow } from "#server/utils/proofs";
+import { deserializeTags } from "#shared/utils/tags";
 import { createChatModel } from "#server/utils/openrouter";
 import { checkRateLimit } from "#server/utils/rateLimit";
 import {

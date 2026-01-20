@@ -223,7 +223,7 @@ watch(() => proofsError.value, (message) => {
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
             {{ isUpdateMode ? 'Update Proof' : 'Save Proof' }}
           </h3>
-          <UButton color="neutral" variant="ghost" icon="tabler:x" @click="isOpen = false" />
+          <UButton color="neutral" variant="ghost" icon="tabler:x" @click="isOpen = false" aria-label="Close panel" />
         </div>
 
         <div class="flex-1 overflow-y-auto p-4 space-y-6">
@@ -269,7 +269,7 @@ watch(() => proofsError.value, (message) => {
           <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
             <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Existing Proofs</h4>
             <UInput v-model="proofSearch" icon="tabler:search" placeholder="Search proofs..." size="sm"
-              class="mb-3" />
+              class="mb-3" aria-label="Search proofs" />
 
             <div v-if="proofsLoading" class="flex justify-center py-4">
               <UIcon name="tabler:loader" class="animate-spin text-gray-400" />
@@ -279,38 +279,38 @@ watch(() => proofsError.value, (message) => {
               No proofs found
             </div>
 
-            <div v-else class="space-y-2 max-h-60 overflow-y-auto pr-1">
-              <div v-for="proof in filteredLibraryProofs" :key="proof.id"
-                class="p-3 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-primary-500 dark:hover:border-primary-500 cursor-pointer transition-colors group"
+            <ul v-else class="space-y-2 max-h-60 overflow-y-auto pr-1 list-none m-0 p-0" aria-label="Saved proofs">
+              <li v-for="proof in filteredLibraryProofs" :key="proof.id"
+                class="p-3 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-primary-500 dark:hover:border-primary-500 transition-colors group"
                 :class="{ 'bg-primary-50 dark:bg-primary-900/10 border-primary-200 dark:border-primary-800': selectedProofForUpdate === proof.id }">
                 <div class="flex justify-between items-start mb-1">
                   <h5 class="text-sm font-medium text-gray-900 dark:text-white truncate pr-2">{{ proof.title }}</h5>
-                  <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <UButton size="xs" variant="ghost" color="info" icon="tabler:edit" @click="prepareUpdate(proof)">
+                  <div class="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <UButton size="xs" variant="ghost" color="info" icon="tabler:edit" @click.stop="prepareUpdate(proof)" aria-label="Edit proof metadata">
                       Edit</UButton>
                   </div>
                 </div>
-                <div class="flex flex-wrap gap-1 mb-2">
-                  <span v-for="tag in proof.tags.slice(0, 3)" :key="tag"
+                <ul class="flex flex-wrap gap-1 mb-2 list-none m-0 p-0" aria-label="Tags">
+                  <li v-for="tag in proof.tags.slice(0, 3)" :key="tag"
                     class="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-600 dark:text-gray-400">
                     {{ tag }}
-                  </span>
-                </div>
+                  </li>
+                </ul>
                 <div class="flex justify-between items-center mt-2">
                   <span class="text-[10px] text-gray-400">
                     {{ new Date(proof.updatedAt).toLocaleDateString() }}
                   </span>
                   <div class="flex gap-2">
-                    <UButton size="xs" variant="soft" color="neutral" icon="tabler:upload" title="Load into editor"
-                      @click="loadProofIntoEditor(proof)">
+                    <UButton size="xs" variant="soft" color="neutral" icon="tabler:upload"
+                      @click.stop="loadProofIntoEditor(proof)" aria-label="Load proof into editor">
                       Load
                     </UButton>
-                    <UButton size="xs" variant="ghost" color="neutral" icon="tabler:copy" title="Copy content"
-                      @click="copyProofContent(proof)" />
+                    <UButton size="xs" variant="ghost" color="neutral" icon="tabler:copy"
+                      @click.stop="copyProofContent(proof)" aria-label="Copy proof content to clipboard" />
                   </div>
                 </div>
-              </div>
-            </div>
+              </li>
+            </ul>
           </div>
         </div>
       </div>

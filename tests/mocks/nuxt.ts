@@ -1,7 +1,7 @@
 import { vi } from "vitest";
-import { ref, computed, readonly, watch } from "vue";
+import { ref, computed, readonly, shallowReadonly, watch } from "vue";
 
-export { ref, computed, readonly, watch };
+export { ref, computed, readonly, shallowReadonly, watch };
 
 export const useState = vi.fn(<T>(key: string, init?: () => T) =>
   ref(init ? init() : undefined),

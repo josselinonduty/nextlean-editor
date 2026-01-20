@@ -1,75 +1,61 @@
 import type { H3Event } from "h3";
 import type { SavedProof } from "#shared/types";
 import { initializeDatabase } from "#server/db";
-import {
-  findProofById,
-  mapProofRow,
-  normalizeIncomingTags,
-  serializeTags,
-} from "#server/utils/proofs";
-import { safeValidateProofRow } from "#server/schemas/proof.schema";
+import { ProofsService } from "#server/services/proofs.service";
 
 type ProofsDatabase = Awaited<ReturnType<typeof initializeDatabase>>;
 
-const handleGet = (db: ProofsDatabase, id: string): SavedProof => {
-  const row = findProofById(db, id);
-  if (!row) {
+const handleGet = (service: ProofsService, id: string): SavedProof => {
+  const proof = service.getById(id);
+  if (!proof) {
     throw createError({
       statusCode: 404,
       statusMessage: "Proof not found",
     });
   }
-  return mapProofRow(row);
+  return proof;
 };
 
 const handlePut = async (
   event: H3Event,
-  db: ProofsDatabase,
+  service: ProofsService,
   id: string,
 ): Promise<SavedProof> => {
   const body = await readBody(event);
-  const existing = findProofById(db, id);
-  if (!existing) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: "Proof not found",
+
+  try {
+    const updated = service.update(id, {
+      title: body.title,
+      content: body.content,
+      tags: body.tags,
     });
-  }
 
-  const now = Date.now();
-  const title =
-    typeof body.title === "string" && body.title.trim().length > 0
-      ? body.title.trim()
-      : existing.title;
-  const content =
-    typeof body.content === "string" && body.content.length > 0
-      ? body.content
-      : existing.content;
-  let tagsValue = existing.tags ?? "[]";
-  if (body.tags !== undefined) {
-    const normalizedTags = normalizeIncomingTags(body.tags);
-    tagsValue = serializeTags(normalizedTags);
-  }
+    if (!updated) {
+      throw createError({
+        statusCode: 404,
+        statusMessage: "Proof not found",
+      });
+    }
 
-  db.prepare(
-    "UPDATE proofs SET title = ?, content = ?, tags = ?, updatedAt = ? WHERE id = ?",
-  ).run(title, content, tagsValue, now, id);
-
-  const updated = db.prepare("SELECT * FROM proofs WHERE id = ?").get(id);
-  const validation = safeValidateProofRow(updated);
-  if (!validation.success) {
-    console.error("Database validation failed:", validation.error.message);
+    return updated;
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 404) {
+      throw error;
+    }
     throw createError({
       statusCode: 500,
-      statusMessage: "Failed to load updated proof",
+      statusMessage:
+        error instanceof Error ? error.message : "Failed to update proof",
     });
   }
-  return mapProofRow(validation.data);
 };
 
-const handleDelete = (db: ProofsDatabase, id: string): { success: boolean } => {
-  const result = db.prepare("DELETE FROM proofs WHERE id = ?").run(id);
-  if (result.changes === 0) {
+const handleDelete = (
+  service: ProofsService,
+  id: string,
+): { success: boolean } => {
+  const deleted = service.delete(id);
+  if (!deleted) {
     throw createError({
       statusCode: 404,
       statusMessage: "Proof not found",
@@ -88,14 +74,15 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = await initializeDatabase();
+  const service = new ProofsService(db);
 
   switch (event.method) {
     case "GET":
-      return handleGet(db, id);
+      return handleGet(service, id);
     case "PUT":
-      return handlePut(event, db, id);
+      return handlePut(event, service, id);
     case "DELETE":
-      return handleDelete(db, id);
+      return handleDelete(service, id);
     default:
       throw createError({
         statusCode: 405,

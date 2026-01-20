@@ -1,11 +1,12 @@
 import { vi } from "vitest";
-import { ref, computed, readonly } from "vue";
+import { ref, computed, readonly, shallowReadonly } from "vue";
 
-export { ref, computed, readonly };
+export { ref, computed, readonly, shallowReadonly };
 
 vi.stubGlobal("ref", ref);
 vi.stubGlobal("computed", computed);
 vi.stubGlobal("readonly", readonly);
+vi.stubGlobal("shallowReadonly", shallowReadonly);
 
 vi.stubGlobal(
   "useState",

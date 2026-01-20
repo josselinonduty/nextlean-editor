@@ -1,19 +1,19 @@
 import { initializeDatabase } from "#server/db";
-import { mapProofRow } from "#server/utils/proofs";
-import { safeValidateProofRows } from "#server/schemas/proof.schema";
+import { ProofsService } from "#server/services/proofs.service";
 
 export default defineEventHandler(async () => {
   const db = await initializeDatabase();
-  const rows = db.prepare("SELECT * FROM proofs ORDER BY updatedAt DESC").all();
+  const service = new ProofsService(db);
 
-  const validation = safeValidateProofRows(rows);
-  if (!validation.success) {
-    console.error("Database validation failed:", validation.error.message);
+  try {
+    return service.getAll();
+  } catch (error) {
     throw createError({
       statusCode: 500,
-      statusMessage: "Database returned invalid data",
+      statusMessage:
+        error instanceof Error
+          ? error.message
+          : "Database returned invalid data",
     });
   }
-
-  return validation.data.map(mapProofRow);
 });

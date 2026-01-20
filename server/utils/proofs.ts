@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { SavedProof } from "#shared/types";
-import { serverLogger } from "#shared/utils/logger";
+import { deserializeTags } from "#shared/utils/tags";
 
 export interface ProofRow {
   id: string;
@@ -10,74 +10,6 @@ export interface ProofRow {
   createdAt: number;
   updatedAt: number;
 }
-
-export const deserializeTags = (raw: string | null): string[] => {
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed
-        .map((tag: unknown) => String(tag).trim())
-        .filter((tag) => tag.length > 0);
-    }
-  } catch (error) {
-    serverLogger.warn(
-      "proofs.deserializeTags",
-      "Failed to parse tags as JSON, falling back to comma split",
-      { raw, error },
-    );
-  }
-  return raw
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter((tag) => tag.length > 0);
-};
-
-export const serializeTags = (tags: string[]): string => {
-  return tags.length > 0 ? JSON.stringify(tags) : "[]";
-};
-
-export const normalizeIncomingTags = (input: unknown): string[] => {
-  if (input === null || input === undefined) return [];
-  if (Array.isArray(input)) {
-    return Array.from(
-      new Set(
-        input
-          .map((tag: unknown) => String(tag).trim())
-          .filter((tag) => tag.length > 0),
-      ),
-    );
-  }
-  if (typeof input === "string") {
-    try {
-      const parsed: unknown = JSON.parse(input);
-      if (Array.isArray(parsed)) {
-        return Array.from(
-          new Set(
-            parsed
-              .map((tag: unknown) => String(tag).trim())
-              .filter((tag) => tag.length > 0),
-          ),
-        );
-      }
-    } catch (error) {
-      serverLogger.warn(
-        "proofs.normalizeIncomingTags",
-        "Failed to parse string as JSON, falling back to comma split",
-        { input, error },
-      );
-    }
-    return Array.from(
-      new Set(
-        input
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter((tag) => tag.length > 0),
-      ),
-    );
-  }
-  return [];
-};
 
 export const mapProofRow = (
   row:

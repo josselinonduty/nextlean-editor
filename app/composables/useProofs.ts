@@ -3,17 +3,9 @@ import type {
   CreateProofRequest,
   UpdateProofRequest,
 } from "#shared/types";
+import type { ShallowRef } from "vue";
 import { clientLogger } from "#shared/utils/logger";
-
-const normalizeTags = (tags?: string[]): string[] => {
-  if (!tags) return [];
-  const unique = new Set<string>();
-  for (const tag of tags) {
-    const value = String(tag).trim();
-    if (value) unique.add(value);
-  }
-  return Array.from(unique);
-};
+import { normalizeTags } from "#shared/utils/tags";
 
 const parseJSON = async <T>(response: Response): Promise<T | null> => {
   const text = await response.text();
@@ -29,7 +21,7 @@ const parseJSON = async <T>(response: Response): Promise<T | null> => {
 };
 
 export interface UseProofsReturn {
-  proofs: Readonly<Ref<SavedProof[]>>;
+  proofs: ShallowRef<SavedProof[]>;
   loading: Readonly<Ref<boolean>>;
   error: Readonly<Ref<string | null>>;
   fetchProofs: () => Promise<void>;
@@ -169,7 +161,7 @@ export const useProofs = (): UseProofsReturn => {
   };
 
   return {
-    proofs: readonly(proofs),
+    proofs: shallowReadonly(proofs),
     loading: readonly(loading),
     error: readonly(error),
     fetchProofs,

@@ -465,9 +465,13 @@ onUnmounted(() => {
         </ClientOnly>
       </div>
 
-      <div v-if="showInfoview"
-        class="w-1 bg-gray-200 dark:bg-gray-800 cursor-col-resize hover:bg-primary transition-colors shrink-0 z-20"
-        @mousedown="startResize"></div>
+      <button v-if="showInfoview"
+        type="button"
+        class="w-1 bg-gray-200 dark:bg-gray-800 cursor-col-resize hover:bg-primary transition-colors shrink-0 z-20 border-none p-0"
+        aria-label="Resize panel. Use left and right arrow keys to adjust."
+        @keydown.left.prevent="infoviewWidth = Math.min(70, infoviewWidth + 5); nextTick(() => monacoEditorRef?.layout())"
+        @keydown.right.prevent="infoviewWidth = Math.max(20, infoviewWidth - 5); nextTick(() => monacoEditorRef?.layout())"
+        @mousedown="startResize"></button>
 
       <EditorInfoviewPanel
         v-if="showInfoview"
