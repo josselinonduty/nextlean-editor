@@ -38,8 +38,20 @@ export function useLeanServer(): UseLeanServerReturn {
     }
   >();
   const messageHandlers = new Set<(message: JsonRpcMessage) => void>();
+  let isIntentionalDisconnect = false;
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT_ATTEMPTS = 3;
+  const RECONNECT_DELAY_MS = 2000;
 
   function connect(): void {
+    if (
+      ws.value?.readyState === WebSocket.OPEN ||
+      ws.value?.readyState === WebSocket.CONNECTING
+    ) {
+      return;
+    }
+
+    isIntentionalDisconnect = false;
     const protocol = globalThis.location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${protocol}//${globalThis.location.host}/api/ws`;
 
@@ -48,6 +60,7 @@ export function useLeanServer(): UseLeanServerReturn {
     ws.value.onopen = () => {
       connected.value = true;
       serverStatus.value = "connected";
+      reconnectAttempts = 0;
     };
 
     ws.value.onmessage = (event) => {
@@ -101,6 +114,21 @@ export function useLeanServer(): UseLeanServerReturn {
       connected.value = false;
       ready.value = false;
       serverStatus.value = "disconnected";
+
+      if (
+        !isIntentionalDisconnect &&
+        reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+      ) {
+        reconnectAttempts++;
+        consoleMessages.value.push({
+          message: `Connection lost, attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`,
+          type: "info",
+          timestamp: Date.now(),
+        });
+        setTimeout(() => {
+          connect();
+        }, RECONNECT_DELAY_MS);
+      }
     };
 
     ws.value.onerror = (): void => {
@@ -114,10 +142,18 @@ export function useLeanServer(): UseLeanServerReturn {
     timeoutMs: number = 30000,
   ): Promise<T> {
     if (!ws.value || !connected.value) {
+      clientLogger.warn(
+        "useLeanServer.sendRequest",
+        "Not connected to Lean server",
+        { method },
+      );
       throw new Error("Not connected to Lean server");
     }
 
     if (!ready.value) {
+      clientLogger.warn("useLeanServer.sendRequest", "Lean server not ready", {
+        method,
+      });
       throw new Error("Lean server not ready");
     }
 
@@ -134,7 +170,15 @@ export function useLeanServer(): UseLeanServerReturn {
         resolve: resolve as (value: unknown) => void,
         reject,
       });
-      ws.value!.send(JSON.stringify(request));
+
+      try {
+        ws.value!.send(JSON.stringify(request));
+      } catch (error) {
+        pendingRequests.delete(id);
+        clientLogger.error("useLeanServer.sendRequest", error, { method });
+        reject(error);
+        return;
+      }
 
       if (timeoutMs > 0) {
         setTimeout(() => {
@@ -149,20 +193,34 @@ export function useLeanServer(): UseLeanServerReturn {
 
   function sendNotification(method: string, params?: unknown): void {
     if (!ws.value || !connected.value) {
-      throw new Error("Not connected to Lean server");
+      clientLogger.warn(
+        "useLeanServer.sendNotification",
+        "Not connected to Lean server",
+        { method },
+      );
+      return;
     }
 
     if (!ready.value) {
-      throw new Error("Lean server not ready");
+      clientLogger.warn(
+        "useLeanServer.sendNotification",
+        "Lean server not ready",
+        { method },
+      );
+      return;
     }
 
-    const notification = {
-      jsonrpc: "2.0",
-      method,
-      params,
-    };
+    try {
+      const notification = {
+        jsonrpc: "2.0",
+        method,
+        params,
+      };
 
-    ws.value.send(JSON.stringify(notification));
+      ws.value.send(JSON.stringify(notification));
+    } catch (error) {
+      clientLogger.error("useLeanServer.sendNotification", error, { method });
+    }
   }
 
   function onMessage(handler: (message: JsonRpcMessage) => void): () => void {
@@ -171,6 +229,8 @@ export function useLeanServer(): UseLeanServerReturn {
   }
 
   function disconnect() {
+    isIntentionalDisconnect = true;
+    reconnectAttempts = MAX_RECONNECT_ATTEMPTS;
     if (ws.value) {
       ws.value.close();
       pendingRequests.clear();

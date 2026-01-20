@@ -327,8 +327,8 @@ const renderMarkdown = (text: string) => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col gap-4">
-    <UCard class="flex min-h-0 flex-1 flex-col overflow-hidden" :ui="{ body: 'flex flex-col h-full p-0 sm:p-0', header: 'p-3 sm:p-3' }">
+  <div class="flex h-full flex-col">
+    <UCard class="flex h-full flex-col overflow-hidden" :ui="{ root: 'h-full flex flex-col', body: 'flex-1 min-h-0 flex flex-col p-0 sm:p-0', header: 'flex-none p-3 sm:p-3', footer: 'flex-none' }">
       <template #header>
         <div class="flex items-center justify-between">
           <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
@@ -344,7 +344,7 @@ const renderMarkdown = (text: string) => {
           />
         </div>
       </template>
-      <div class="flex-1 overflow-y-auto px-4 py-4">
+      <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4">
         <UChatMessages
           :messages="chatMessages"
           :status="status"
@@ -390,7 +390,7 @@ const renderMarkdown = (text: string) => {
         </UChatMessages>
       </div>
 
-      <div class="border-t border-gray-200 p-4 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+      <div class="flex-none border-t border-gray-200 p-4 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
         <UChatPrompt
           v-model="draft"
           :disabled="isBusy"

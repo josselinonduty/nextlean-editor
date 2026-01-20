@@ -62,7 +62,8 @@ const themeOptions = [
 </script>
 
 <template>
-  <div class="p-8 max-w-4xl mx-auto space-y-8">
+  <div class="h-full overflow-y-auto">
+    <div class="p-8 max-w-4xl mx-auto space-y-8">
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
@@ -167,5 +168,6 @@ const themeOptions = [
         </template>
       </UCard>
     </UForm>
+  </div>
   </div>
 </template>

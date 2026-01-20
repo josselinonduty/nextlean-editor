@@ -45,6 +45,7 @@ const cursorPosition = ref<{ lineNumber: number; column: number }>({ lineNumber:
 
 let resizeAnimationFrame: number | null = null
 let goalUpdateTimeout: ReturnType<typeof setTimeout> | null = null
+let layoutTimeout: ReturnType<typeof setTimeout> | null = null
 
 const leanLsp = useLeanLsp()
 
@@ -283,7 +284,12 @@ const handleResize = (event: MouseEvent) => {
     const newInfoviewWidth = ((containerRect.right - event.clientX) / containerRect.width) * 100
     infoviewWidth.value = Math.max(20, Math.min(70, newInfoviewWidth))
 
-    monacoEditorRef.value?.layout()
+    if (layoutTimeout) {
+      clearTimeout(layoutTimeout)
+    }
+    layoutTimeout = setTimeout(() => {
+      monacoEditorRef.value?.layout()
+    }, 16)
   })
 }
 
@@ -350,6 +356,9 @@ onUnmounted(() => {
   if (goalUpdateTimeout) {
     clearTimeout(goalUpdateTimeout)
   }
+  if (layoutTimeout) {
+    clearTimeout(layoutTimeout)
+  }
 })
 </script>
 
@@ -411,8 +420,8 @@ onUnmounted(() => {
       @reconnect="reconnectLeanServer"
     />
 
-    <div class="flex-1 flex min-h-0 relative" ref="mainContainer">
-      <div class="relative h-full flex flex-col overflow-hidden" :class="{ 'select-none': isResizing }"
+    <div class="flex-1 flex min-h-0 overflow-hidden" ref="mainContainer">
+      <div class="relative h-full flex flex-col min-w-0 overflow-hidden" :class="{ 'select-none': isResizing }"
         :style="{ width: showInfoview ? `${100 - infoviewWidth}%` : '100%' }">
         <div v-if="!leanLsp.ready.value"
           class="absolute inset-0 z-50 bg-gray-900 text-white font-mono p-4 overflow-hidden flex flex-col">
@@ -522,5 +531,9 @@ onUnmounted(() => {
 [class*="infoview"] {
   will-change: width;
   transform: translateZ(0);
+}
+
+:deep(.dashboard-panel) {
+  overflow: hidden;
 }
 </style>

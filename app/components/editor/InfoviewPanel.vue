@@ -34,14 +34,13 @@ const infoviewTabs = [
 
 <template>
   <div
-    class="shrink-0 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-all duration-200 flex flex-col overflow-hidden h-full"
+    class="shrink-0 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col overflow-hidden h-full"
     :style="{ width: `${width}%` }">
-    <div class="h-full flex flex-col">
-      <UTabs :items="infoviewTabs" class="w-full h-full flex flex-col"
-        :ui="{ list: 'flex-none', content: 'flex-1 min-h-0 overflow-hidden' }">
-        <template #lean>
-          <div class="h-full w-full flex flex-col overflow-hidden">
-            <div class="flex-1 p-4 overflow-y-auto">
+    <UTabs :items="infoviewTabs" class="w-full h-full flex flex-col"
+      :ui="{ root: 'h-full flex flex-col bg-white dark:bg-gray-900', list: 'flex-none bg-gray-50 dark:bg-gray-950 rounded-none', content: 'flex-1 min-h-0 overflow-hidden' }">
+      <template #lean>
+        <div class="h-full w-full flex flex-col overflow-hidden">
+          <div class="flex-1 min-h-0 p-4 overflow-y-auto">
               <UAccordion :items="[
                 {
                   label: 'Diagnostics',
@@ -108,11 +107,10 @@ const infoviewTabs = [
         </template>
 
         <template #assist>
-          <div class="h-full w-full p-0 overflow-hidden">
-            <AssistantChatPanel />
+          <div class="h-full w-full flex flex-col overflow-hidden">
+            <AssistantChatPanel class="h-full" />
           </div>
         </template>
       </UTabs>
-    </div>
   </div>
 </template>

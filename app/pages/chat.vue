@@ -15,7 +15,7 @@ useSeoMeta({
       </p>
     </div>
 
-    <div class="flex-1 min-h-0 p-6 bg-gray-50 dark:bg-gray-950">
+    <div class="flex-1 min-h-0 p-6 bg-gray-50 dark:bg-gray-950 overflow-hidden">
       <AssistantChatPanel class="h-full" />
     </div>
   </div>

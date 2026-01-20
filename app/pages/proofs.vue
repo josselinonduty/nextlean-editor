@@ -104,7 +104,8 @@ const formatDate = (timestamp: number) => {
 </script>
 
 <template>
-  <div class="p-8 space-y-8">
+  <div class="h-full overflow-y-auto">
+    <div class="p-8 space-y-8">
     <div class="space-y-4">
       <div class="flex items-center justify-between">
         <div class="space-y-2">
@@ -320,5 +321,6 @@ const formatDate = (timestamp: number) => {
         </div>
       </template>
     </USlideover>
+  </div>
   </div>
 </template>

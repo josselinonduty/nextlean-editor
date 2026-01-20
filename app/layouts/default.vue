@@ -2,72 +2,73 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
 
-// Reactive state for sidebar
 const sidebarCollapsed = ref(false)
 
-// Page title from route meta or default
 const route = useRoute()
 const pageTitle = computed(() => {
-  // Try to get title from various sources
   return (route.meta?.title as string) || 'NextLean'
 })
 
-// Navigation items for the main menu
-const navigationItems: NavigationMenuItem[][] = [[
+const navigationItems = computed<NavigationMenuItem[][]>(() => [[
   {
     label: 'Editor',
     icon: 'tabler:code',
-    to: '/editor'
+    to: '/editor',
+    active: route.path === '/editor'
   },
   {
     label: 'Chat',
     icon: 'tabler:message-circle',
-    to: '/chat'
+    to: '/chat',
+    active: route.path === '/chat'
   },
   {
     label: 'Proofs',
     icon: 'tabler:file-text',
-    to: '/proofs'
+    to: '/proofs',
+    active: route.path === '/proofs'
   }
-]]
+]])
 
-// Footer navigation items
-const footerItems: NavigationMenuItem[][] = [[
+const footerItems = computed<NavigationMenuItem[][]>(() => [[
   {
     label: 'Settings',
     icon: 'tabler:settings',
-    to: '/settings'
+    to: '/settings',
+    active: route.path === '/settings'
   },
   {
     label: 'Help',
     icon: 'tabler:help-circle',
-    to: '/help'
+    to: '/help',
+    active: route.path === '/help'
   }
-]]
+]])
 </script>
 
 <template>
   <UDashboardGroup>
-    <!-- Sidebar -->
     <UDashboardSidebar
       v-model:collapsed="sidebarCollapsed"
       collapsible
       resizable
+      class="border-r border-gray-200 dark:border-gray-800"
     >
       <template #header="{ collapsed }">
-        <UIcon 
-          v-if="collapsed" 
-          name="tabler:math-symbols" 
-          class="size-5 text-primary mx-auto" 
-        />
-        <div v-else class="flex items-center gap-2">
-          <UIcon name="tabler:math-symbols" class="size-5 text-primary" />
-          <span class="font-semibold text-sm">NextLean</span>
+        <div class="flex items-center justify-center py-1">
+          <UIcon 
+            v-if="collapsed" 
+            name="tabler:math-symbols" 
+            class="size-6 text-primary" 
+          />
+          <div v-else class="flex items-center gap-2.5">
+            <UIcon name="tabler:math-symbols" class="size-6 text-primary" />
+            <span class="font-semibold text-base tracking-tight">NextLean</span>
+          </div>
         </div>
       </template>
 
       <template #default="{ collapsed }">
-        <!-- Navigation Menu -->
         <UNavigationMenu
           :collapsed="collapsed"
           :items="navigationItems"
@@ -85,9 +86,7 @@ const footerItems: NavigationMenuItem[][] = [[
       </template>
     </UDashboardSidebar>
 
-    <!-- Main Content Panel -->
     <UDashboardPanel grow>
-      <!-- Top Bar -->
       <template #header>
         <UDashboardNavbar :title="pageTitle">
           <template #left>
@@ -96,9 +95,8 @@ const footerItems: NavigationMenuItem[][] = [[
         </UDashboardNavbar>
       </template>
 
-      <!-- Page Content -->
       <template #body>
-        <div class="h-full flex flex-col overflow-y-auto min-h-0">
+        <div class="h-full flex flex-col min-h-0">
           <slot />
         </div>
       </template>

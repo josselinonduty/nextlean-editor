@@ -34,6 +34,8 @@ export class LeanServerManager {
   private consecutiveFailures = 0;
   private currentWorkspaceUri?: string;
   private isRestarting = false;
+  private isInitialized = false;
+  private isStopping = false;
 
   async start(workspaceUri: string): Promise<void> {
     if (this.process) {
@@ -252,6 +254,7 @@ export class LeanServerManager {
 
     console.log("Lean server initialized");
     this.sendNotification("initialized", {});
+    this.isInitialized = true;
   }
 
   async sendRequest(
@@ -331,15 +334,19 @@ export class LeanServerManager {
     this.pendingRequests.clear();
     this.messageCallbacks.clear();
     this.process = undefined;
+    this.isInitialized = false;
+    this.isStopping = false;
   }
 
   async stop(): Promise<void> {
+    if (this.isStopping) return;
+    this.isStopping = true;
     this.stopHealthCheck();
-    if (!this.process) return;
 
-    try {
-      this.sendNotification("exit");
-    } catch {}
+    if (!this.process) {
+      this.isStopping = false;
+      return;
+    }
 
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
@@ -353,6 +360,21 @@ export class LeanServerManager {
         this.cleanup();
         resolve();
       });
+
+      try {
+        if (this.isInitialized && this.writer) {
+          this.sendNotification("shutdown");
+          setTimeout(() => {
+            try {
+              this.sendNotification("exit");
+            } catch {}
+          }, 100);
+        } else {
+          this.process?.kill("SIGTERM");
+        }
+      } catch {
+        this.process?.kill("SIGTERM");
+      }
     });
   }
 }

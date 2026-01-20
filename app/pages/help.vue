@@ -68,7 +68,8 @@ const features = [
 </script>
 
 <template>
-  <div class="p-8 max-w-7xl mx-auto space-y-12">
+  <div class="h-full overflow-y-auto">
+    <div class="p-8 max-w-7xl mx-auto space-y-12">
     <!-- Header -->
     <div class="text-center space-y-4">
       <h1 class="text-4xl font-bold text-gray-900 dark:text-white">
@@ -168,5 +169,6 @@ const features = [
         ]"
       />
     </div>
+  </div>
   </div>
 </template>

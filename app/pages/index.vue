@@ -32,7 +32,8 @@ const stats = [
 </script>
 
 <template>
-  <div class="p-8 max-w-7xl mx-auto space-y-16">
+  <div class="h-full overflow-y-auto">
+    <div class="p-8 max-w-7xl mx-auto space-y-16">
     <!-- Hero Section -->
     <div class="text-center space-y-8 py-12">
       <div class="space-y-4">
@@ -112,5 +113,6 @@ const stats = [
         </div>
       </UCard>
     </div>
+  </div>
   </div>
 </template>
