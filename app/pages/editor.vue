@@ -25,7 +25,8 @@ const {
   markModified,
   incrementVersion,
   setDocumentOpen,
-  reset: resetDocument
+  reset: resetDocument,
+  registerEditor
 } = useEditorState()
 const { settings, updateSettings } = useSettings()
 
@@ -86,6 +87,9 @@ const reconnectLeanServer = () => {
 }
 
 const handleEditorReady = () => {
+  if (monacoEditorRef.value) {
+    registerEditor(monacoEditorRef.value as import('~/composables/useEditorState').MonacoEditorRef)
+  }
   leanLsp.setupDiagnosticsListener()
   leanLsp.connect()
 }

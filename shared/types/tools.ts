@@ -17,6 +17,13 @@ export interface EditEditorInput {
   newContent: string;
 }
 
+export interface EditPreview {
+  startLine: number;
+  endLine: number;
+  oldContent: string;
+  newContent: string;
+}
+
 export interface AddDependencyInput {
   name: string;
   url: string;

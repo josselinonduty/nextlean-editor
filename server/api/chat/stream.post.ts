@@ -104,6 +104,16 @@ const normalizeChatBody = (body: ChatRequestBody) => {
   };
 };
 
+interface StreamEvent {
+  type: "token" | "tool_start" | "tool_end" | "done" | "error";
+  content?: string;
+  name?: string;
+  input?: unknown;
+  output?: string;
+  message?: string;
+  steps?: ToolCallResult[];
+}
+
 export default defineEventHandler(async (event) => {
   const ip =
     getHeader(event, "x-forwarded-for") ||
@@ -132,6 +142,15 @@ export default defineEventHandler(async (event) => {
       statusMessage: "OpenRouter API key is not configured",
     });
   }
+
+  setHeader(event, "Content-Type", "text/event-stream");
+  setHeader(event, "Cache-Control", "no-cache");
+  setHeader(event, "Connection", "keep-alive");
+  setHeader(event, "X-Accel-Buffering", "no");
+
+  const write = (data: StreamEvent) => {
+    event.node.res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
 
   const db = await initializeDatabase();
 
@@ -257,21 +276,12 @@ export default defineEventHandler(async (event) => {
         return "Error: lakefile.lean not found.";
       }
 
-      // Check if already exists (naive check)
-      // In a real app, we should parse the file.
-      // Here we just append.
-
       const dependencyString = `\nrequire ${name} from git\n  "${url}"\n`;
 
       try {
         appendFileSync(lakefilePath, dependencyString);
 
-        // Run lake update
-        // We don't wait for it to finish because it takes too long?
-        // Or we wait? It might timeout the request.
-        // Let's trigger it and return "started".
-
-        exec("lake update", { cwd: projectPath }, (error, stdout, stderr) => {
+        exec("lake update", { cwd: projectPath }, (error, stdout) => {
           if (error) {
             console.error(`lake update error: ${error}`);
             return;
@@ -359,7 +369,6 @@ When providing code solutions, ALWAYS try to apply them directly using the 'edit
     ...normalizedMessages.map(toMessage),
   ];
 
-  let reply = "";
   const steps: ToolCallResult[] = [];
 
   try {
@@ -375,7 +384,14 @@ When providing code solutions, ALWAYS try to apply them directly using the 'edit
       iterations < MAX_ITERATIONS
     ) {
       iterations++;
+
       for (const toolCall of response.tool_calls) {
+        write({
+          type: "tool_start",
+          name: toolCall.name,
+          input: toolCall.args,
+        });
+
         const selectedTool =
           toolsByName[toolCall.name as keyof typeof toolsByName];
         if (!selectedTool) {
@@ -385,6 +401,11 @@ When providing code solutions, ALWAYS try to apply them directly using the 'edit
               content: "Tool not found",
             }),
           );
+          write({
+            type: "tool_end",
+            name: toolCall.name,
+            output: "Tool not found",
+          });
           continue;
         }
 
@@ -409,24 +430,33 @@ When providing code solutions, ALWAYS try to apply them directly using the 'edit
             content: output,
           }),
         );
+
+        write({
+          type: "tool_end",
+          name: toolCall.name,
+          input: toolCall.args,
+          output,
+        });
       }
+
       response = await chatModel.invoke(messages);
       messages.push(response);
     }
 
-    reply = getTextContent(response.content).trim();
-  } catch (error) {
-    console.error("Chat error:", error);
-    const errorObj = error as Record<string, unknown> | null;
-    if (errorObj?.response && typeof errorObj.response === "object") {
-      const responseData = (errorObj.response as Record<string, unknown>).data;
-      if (responseData) {
-        console.error(
-          "Error response data:",
-          JSON.stringify(responseData, null, 2),
-        );
+    const finalContent = getTextContent(response.content);
+    if (finalContent) {
+      const words = finalContent.split(/(\s+)/);
+      for (const word of words) {
+        if (word) {
+          write({ type: "token", content: word });
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
       }
     }
+
+    write({ type: "done", steps });
+  } catch (error) {
+    console.error("Chat stream error:", error);
     const detail = (() => {
       if (!error || typeof error !== "object") return null;
       if (error instanceof Error) return error.message;
@@ -436,18 +466,8 @@ When providing code solutions, ALWAYS try to apply them directly using the 'edit
       }
       return null;
     })();
-    throw createError({
-      statusCode: 502,
-      statusMessage: detail ?? "Chat model request failed",
-    });
+    write({ type: "error", message: detail ?? "Chat model request failed" });
   }
 
-  if (reply.length === 0) {
-    reply = "I was unable to generate a response. Please try asking again.";
-  }
-
-  return {
-    message: reply,
-    steps,
-  };
+  event.node.res.end();
 });

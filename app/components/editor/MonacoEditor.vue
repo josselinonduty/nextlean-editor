@@ -419,6 +419,66 @@ const setTheme = async (theme: string) => {
   monaco.editor.setTheme(theme)
 }
 
+interface EditOperation {
+  startLine: number
+  endLine: number
+  newContent: string
+}
+
+interface EditPreview {
+  startLine: number
+  endLine: number
+  oldContent: string
+  newContent: string
+}
+
+const getEditPreview = (edit: EditOperation): EditPreview | null => {
+  if (!editorInstance) return null
+  const model = editorInstance.getModel()
+  if (!model) return null
+
+  const lineCount = model.getLineCount()
+  const startLine = Math.max(1, Math.min(edit.startLine, lineCount))
+  const endLine = Math.max(startLine, Math.min(edit.endLine, lineCount))
+
+  const oldContent = model.getValueInRange({
+    startLineNumber: startLine,
+    startColumn: 1,
+    endLineNumber: endLine,
+    endColumn: model.getLineMaxColumn(endLine)
+  })
+
+  return {
+    startLine,
+    endLine,
+    oldContent,
+    newContent: edit.newContent
+  }
+}
+
+const executeEdit = async (edit: EditOperation): Promise<boolean> => {
+  if (!editorInstance) return false
+  const model = editorInstance.getModel()
+  if (!model) return false
+
+  const lineCount = model.getLineCount()
+  const startLine = Math.max(1, Math.min(edit.startLine, lineCount))
+  const endLine = Math.max(startLine, Math.min(edit.endLine, lineCount))
+
+  editorInstance.executeEdits('assistant', [{
+    range: {
+      startLineNumber: startLine,
+      startColumn: 1,
+      endLineNumber: endLine,
+      endColumn: model.getLineMaxColumn(endLine)
+    },
+    text: edit.newContent
+  }])
+
+  editorInstance.pushUndoStop()
+  return true
+}
+
 defineExpose({
   getValue,
   setValue,
@@ -426,7 +486,9 @@ defineExpose({
   layout,
   updateOptions,
   setTheme,
-  updateEditorMarkers
+  updateEditorMarkers,
+  executeEdit,
+  getEditPreview
 })
 
 onMounted(async () => {
