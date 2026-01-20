@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { z } from 'zod'
+import type { FormSubmitEvent } from '@nuxt/ui'
+
 useSeoMeta({
   title: 'Settings - NextLean'
 })
@@ -6,8 +9,19 @@ useSeoMeta({
 const { settings, updateSettings, resetSettings } = useSettings()
 const toast = useToast()
 
-// Local state for form handling
-const form = reactive({
+const settingsSchema = z.object({
+  editorFontSize: z.coerce.number()
+    .min(10, 'Font size must be at least 10px')
+    .max(32, 'Font size must be at most 32px'),
+  editorTheme: z.enum(['vs-dark', 'vs-light']),
+  editorWordWrap: z.boolean(),
+  editorMinimap: z.boolean(),
+  editorLineNumbers: z.boolean(),
+})
+
+type SettingsFormData = z.infer<typeof settingsSchema>
+
+const formState = reactive<SettingsFormData>({
   editorFontSize: settings.value.editorFontSize,
   editorTheme: settings.value.editorTheme,
   editorWordWrap: settings.value.editorWordWrap,
@@ -15,13 +29,12 @@ const form = reactive({
   editorLineNumbers: settings.value.editorLineNumbers,
 })
 
-// Watch for changes in store to update local form if changed elsewhere
 watch(settings, (newSettings) => {
-  Object.assign(form, newSettings)
+  Object.assign(formState, newSettings)
 }, { deep: true })
 
-const saveSettings = () => {
-  updateSettings(form)
+const handleSubmit = (event: FormSubmitEvent<SettingsFormData>) => {
+  updateSettings(event.data)
   toast.add({
     title: 'Settings saved',
     description: 'Your preferences have been updated successfully.',
@@ -66,18 +79,10 @@ const themeOptions = [
         >
           Reset Defaults
         </UButton>
-        <UButton
-          color="primary"
-          icon="tabler:device-floppy"
-          @click="saveSettings"
-        >
-          Save Changes
-        </UButton>
       </div>
     </div>
 
-    <div class="space-y-6">
-      <!-- Editor Settings -->
+    <UForm :schema="settingsSchema" :state="formState" @submit="handleSubmit" class="space-y-6">
       <UCard>
         <template #header>
           <div class="flex items-center gap-2">
@@ -88,18 +93,18 @@ const themeOptions = [
 
         <div class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <UFormField label="Theme" help="Choose your preferred color theme">
+            <UFormField name="editorTheme" label="Theme" help="Choose your preferred color theme">
               <USelect
-                v-model="form.editorTheme"
+                v-model="formState.editorTheme"
                 :items="themeOptions"
                 option-attribute="label"
                 value-attribute="value"
               />
             </UFormField>
 
-            <UFormField label="Font Size" help="Editor font size in pixels">
+            <UFormField name="editorFontSize" label="Font Size" help="Editor font size in pixels">
               <UInput
-                v-model.number="form.editorFontSize"
+                v-model.number="formState.editorFontSize"
                 type="number"
                 min="10"
                 max="32"
@@ -112,34 +117,47 @@ const themeOptions = [
           </div>
 
           <div class="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
-            <div class="flex items-center justify-between">
-              <div class="space-y-0.5">
-                <div class="text-sm font-medium text-gray-900 dark:text-white">Word Wrap</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">Wrap long lines to fit the viewport</div>
+            <UFormField name="editorWordWrap">
+              <div class="flex items-center justify-between">
+                <div class="space-y-0.5">
+                  <div class="text-sm font-medium text-gray-900 dark:text-white">Word Wrap</div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">Wrap long lines to fit the viewport</div>
+                </div>
+                <USwitch v-model="formState.editorWordWrap" />
               </div>
-              <USwitch v-model="form.editorWordWrap" />
-            </div>
+            </UFormField>
 
-            <div class="flex items-center justify-between">
-              <div class="space-y-0.5">
-                <div class="text-sm font-medium text-gray-900 dark:text-white">Minimap</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">Show a code overview on the right</div>
+            <UFormField name="editorMinimap">
+              <div class="flex items-center justify-between">
+                <div class="space-y-0.5">
+                  <div class="text-sm font-medium text-gray-900 dark:text-white">Minimap</div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">Show a code overview on the right</div>
+                </div>
+                <USwitch v-model="formState.editorMinimap" />
               </div>
-              <USwitch v-model="form.editorMinimap" />
-            </div>
+            </UFormField>
 
-            <div class="flex items-center justify-between">
-              <div class="space-y-0.5">
-                <div class="text-sm font-medium text-gray-900 dark:text-white">Line Numbers</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">Show line numbers in the gutter</div>
+            <UFormField name="editorLineNumbers">
+              <div class="flex items-center justify-between">
+                <div class="space-y-0.5">
+                  <div class="text-sm font-medium text-gray-900 dark:text-white">Line Numbers</div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">Show line numbers in the gutter</div>
+                </div>
+                <USwitch v-model="formState.editorLineNumbers" />
               </div>
-              <USwitch v-model="form.editorLineNumbers" />
-            </div>
+            </UFormField>
           </div>
         </div>
+
+        <template #footer>
+          <div class="flex justify-end">
+            <UButton type="submit" color="primary" icon="tabler:device-floppy">
+              Save Changes
+            </UButton>
+          </div>
+        </template>
       </UCard>
 
-      <!-- AI Assistant Settings -->
       <UCard>
         <template #header>
           <div class="flex items-center gap-2">
@@ -148,6 +166,6 @@ const themeOptions = [
           </div>
         </template>
       </UCard>
-    </div>
+    </UForm>
   </div>
 </template>

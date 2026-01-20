@@ -11,7 +11,6 @@ export default defineNuxtConfig({
 
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
-  ssr: false,
 
   nitro: {
     experimental: {
@@ -40,8 +39,8 @@ export default defineNuxtConfig({
             src: normalizePath(
               path.resolve(
                 __dirname,
-                "./node_modules/monaco-editor/min/vs/**/*"
-              )
+                "./node_modules/monaco-editor/min/vs/**/*",
+              ),
             ),
             dest: "monaco-editor/min/vs",
           },

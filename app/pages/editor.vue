@@ -15,17 +15,23 @@ const mainContainer = ref<HTMLElement>()
 const monacoEditorRef = ref<InstanceType<typeof import('~/components/editor/MonacoEditor.vue').default>>()
 const proofLibraryRef = ref<InstanceType<typeof import('~/components/editor/ProofLibrarySlideover.vue').default>>()
 
-const { code, updateCode } = useEditorState()
+const {
+  document: editorDocument,
+  code,
+  updateContent,
+  updateCursor,
+  setFileName,
+  markSaved,
+  markModified,
+  incrementVersion,
+  setDocumentOpen,
+  reset: resetDocument
+} = useEditorState()
 const { settings, updateSettings } = useSettings()
 
-const fileName = ref('main.lean')
-const isModified = ref(false)
 const showInfoview = ref(true)
 const infoviewWidth = ref(50)
 const isResizing = ref(false)
-const documentVersion = ref(1)
-const documentUri = ref('file:///workspace/main.lean')
-const isDocumentOpen = ref(false)
 
 const showSavePanel = ref(false)
 const currentProofId = ref<string | null>(null)
@@ -44,30 +50,26 @@ watch(() => leanLsp.ready.value, (ready) => {
     leanErrors.value = []
     showErrorModal.value = false
 
-    if (leanLsp.rootUri.value) {
-      documentUri.value = `${leanLsp.rootUri.value}/Main.lean`
-    }
-
     leanLsp.openTextDocument(
-      documentUri.value,
+      editorDocument.value.uri,
       'lean',
-      documentVersion.value,
+      editorDocument.value.version,
       code.value
     )
-    isDocumentOpen.value = true
+    setDocumentOpen(true)
   }
 })
 
 watch(() => leanLsp.connected.value, (connected) => {
   if (!connected) {
-    isDocumentOpen.value = false
+    setDocumentOpen(false)
   }
 })
 
 watch(() => leanLsp.diagnostics.value, (diagnosticsArray) => {
   if (diagnosticsArray.length > 0) {
     const latest = diagnosticsArray.at(-1)
-    if (latest && latest.uri === documentUri.value) {
+    if (latest && latest.uri === editorDocument.value.uri) {
       leanDiagnostics.value = latest.diagnostics
       monacoEditorRef.value?.updateEditorMarkers(leanDiagnostics.value)
     }
@@ -87,25 +89,25 @@ const handleEditorReady = () => {
 }
 
 const handleContentChange = () => {
-  isModified.value = true
-  documentVersion.value++
+  markModified()
+  incrementVersion()
 
-  if (isDocumentOpen.value && leanLsp.connected.value) {
-    leanLsp.changeTextDocument(documentUri.value, documentVersion.value, [{
+  if (editorDocument.value.isOpen && leanLsp.connected.value) {
+    leanLsp.changeTextDocument(editorDocument.value.uri, editorDocument.value.version, [{
       text: code.value
     }])
   }
 }
 
 const handleCodeUpdate = (newCode: string) => {
-  updateCode(newCode)
+  updateContent(newCode)
 }
 
 const newFile = () => {
   const newContent = '-- New Lean file\n\n'
   monacoEditorRef.value?.setValue(newContent)
-  fileName.value = 'untitled.lean'
-  isModified.value = false
+  setFileName('untitled.lean')
+  markSaved()
   currentProofId.value = null
 }
 
@@ -120,8 +122,8 @@ const openFile = () => {
       try {
         const content = await file.text()
         monacoEditorRef.value?.setValue(content)
-        fileName.value = file.name
-        isModified.value = false
+        setFileName(file.name)
+        markSaved()
       } catch (error) {
         clientLogger.error('editor.openFile', error, { fileName: file.name })
         toast.add({
@@ -141,10 +143,10 @@ const saveFile = () => {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = fileName.value
+  a.download = editorDocument.value.fileName
   a.click()
   URL.revokeObjectURL(url)
-  isModified.value = false
+  markSaved()
 }
 
 const handleOpenSavePanel = async () => {
@@ -157,14 +159,14 @@ const handleOpenSavePanel = async () => {
 
 const handleLoadProof = (proof: SavedProof) => {
   monacoEditorRef.value?.setValue(proof.content)
-  updateCode(proof.content)
+  updateContent(proof.content)
   currentProofId.value = proof.id
-  isModified.value = false
+  markSaved()
 }
 
 const handleProofSaved = (proof: SavedProof) => {
   currentProofId.value = proof.id
-  isModified.value = false
+  markSaved()
 }
 
 const loadProofFromDatabase = async () => {
@@ -174,9 +176,9 @@ const loadProofFromDatabase = async () => {
   if (encodedContent) {
     const decoded = decodeURIComponent(encodedContent)
     monacoEditorRef.value?.setValue(decoded)
-    updateCode(decoded)
+    updateContent(decoded)
     currentProofId.value = proofId || null
-    isModified.value = false
+    markSaved()
     await navigateTo('/editor', { replace: true })
     return
   }
@@ -289,8 +291,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (isDocumentOpen.value && leanLsp.connected.value) {
-    leanLsp.closeTextDocument(documentUri.value)
+  if (editorDocument.value.isOpen && leanLsp.connected.value) {
+    leanLsp.closeTextDocument(editorDocument.value.uri)
   }
   leanLsp.disconnect()
   document.removeEventListener('mousemove', handleResize)
@@ -344,8 +346,8 @@ onUnmounted(() => {
     </UModal>
 
     <EditorToolbar
-      :file-name="fileName"
-      :is-modified="isModified"
+      :file-name="editorDocument.fileName"
+      :is-modified="editorDocument.isModified"
       :is-connected="leanLsp.connected.value"
       :is-saving="false"
       :proofs-loading="false"
@@ -390,9 +392,9 @@ onUnmounted(() => {
           <EditorMonacoEditor
             ref="monacoEditorRef"
             v-model="code"
-            :document-uri="documentUri"
-            :document-version="documentVersion"
-            :is-document-open="isDocumentOpen"
+            :document-uri="editorDocument.uri"
+            :document-version="editorDocument.version"
+            :is-document-open="editorDocument.isOpen"
             :theme="settings.editorTheme"
             :font-size="settings.editorFontSize"
             :word-wrap="settings.editorWordWrap"
@@ -402,6 +404,14 @@ onUnmounted(() => {
             @content-change="handleContentChange"
             @ready="handleEditorReady"
           />
+          <template #fallback>
+            <div class="flex-1 flex items-center justify-center bg-gray-900">
+              <div class="flex flex-col items-center gap-4">
+                <UIcon name="tabler:loader" class="w-8 h-8 text-gray-400 animate-spin" />
+                <span class="text-gray-400 text-sm">Loading editor...</span>
+              </div>
+            </div>
+          </template>
         </ClientOnly>
       </div>
 

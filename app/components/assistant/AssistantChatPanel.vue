@@ -10,7 +10,7 @@ interface PayloadMessage {
 
 const toast = useToast();
 const { status, messages, createId, createPart, clearMessages } = useChat();
-const { code, updateCode } = useEditorState();
+const { code, updateContent } = useEditorState();
 const { diagnostics } = useLeanLsp();
 const draft = ref("");
 const promptError = ref<Error | null>(null);
@@ -91,7 +91,7 @@ const sendPayload = async (payload: PayloadMessage[]): Promise<void> => {
                 args.newContent,
                 ...after
               ];
-              updateCode(newLines.join("\n"));
+              updateContent(newLines.join("\n"));
               toast.add({ title: "Editor updated", description: `Lines ${args.startLine}-${args.endLine} modified.`, color: "green" });
             }
           } catch (e) {
