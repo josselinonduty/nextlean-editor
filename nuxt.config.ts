@@ -1,5 +1,4 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
-import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import { normalizePath } from "vite";
 import path from "node:path";
@@ -19,6 +18,9 @@ export default defineNuxtConfig({
     devServer: {
       watch: [],
     },
+    externals: {
+      external: ["better-sqlite3"],
+    },
   },
 
   alias: {
@@ -28,11 +30,6 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [
-      nodePolyfills({
-        overrides: {
-          fs: "memfs",
-        },
-      }),
       viteStaticCopy({
         targets: [
           {

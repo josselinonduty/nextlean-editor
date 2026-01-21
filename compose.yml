@@ -5,7 +5,7 @@ services:
       - "3000:3000"
     volumes:
       - ./lean_project:/home/node/app/lean_project
-      - ./data:/home/node/app/.output/.data
+      - ./data:/home/node/app/.data
     env_file:
       - .env
     environment:

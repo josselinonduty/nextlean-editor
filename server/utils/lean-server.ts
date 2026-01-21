@@ -8,7 +8,7 @@ import {
   type Message,
   type NotificationMessage,
   type RequestMessage,
-} from "vscode-jsonrpc/node";
+} from "vscode-jsonrpc/node.js";
 import type { JsonRpcMessage } from "#shared/types/jsonrpc";
 import { JsonRpcMessageHandler } from "./jsonrpc";
 
@@ -361,20 +361,32 @@ export class LeanServerManager {
         resolve();
       });
 
-      try {
-        if (this.isInitialized && this.writer) {
-          this.sendNotification("shutdown");
-          setTimeout(() => {
+      (async () => {
+        try {
+          if (this.isInitialized && this.writer) {
             try {
-              this.sendNotification("exit");
-            } catch {}
-          }, 100);
-        } else {
+              // Send shutdown request and wait for response with timeout
+              await this.sendRequest("shutdown", {}, 2000);
+            } catch (e) {
+              console.warn("[LeanServer] Shutdown request failed:", e);
+            }
+
+            try {
+              // Send exit notification only if writer is still available
+              if (this.writer) {
+                this.sendNotification("exit");
+              }
+            } catch (e) {
+              // Ignore if stream is destroyed
+            }
+          } else {
+            this.process?.kill("SIGTERM");
+          }
+        } catch (e) {
+          console.error("[LeanServer] Error during stop sequence:", e);
           this.process?.kill("SIGTERM");
         }
-      } catch {
-        this.process?.kill("SIGTERM");
-      }
+      })();
     });
   }
 }

@@ -47,7 +47,15 @@ The easiest way to run NextLean is with Docker.
    docker compose up -d
    ```
 
-4. **Open your browser**
+4. **Initialize the Lean project**
+
+   The first time you run the application, you need to build the Lean project:
+
+   ```bash
+   docker compose exec app sh -c "cd lean_project && lake update && lake build"
+   ```
+
+5. **Open your browser**
 
    Navigate to [http://localhost:3000](http://localhost:3000)
 

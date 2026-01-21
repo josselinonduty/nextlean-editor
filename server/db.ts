@@ -1,18 +1,15 @@
 import Database from "better-sqlite3";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = join(__dirname, "..", ".data", "proofs.db");
+const dataDir = join(process.cwd(), ".data");
+const dbPath = join(dataDir, "proofs.db");
 
 let db: Database.Database | null = null;
 
 export async function initializeDatabase(): Promise<Database.Database> {
   if (db) return db;
-
-  const dataDir = dirname(dbPath);
 
   if (!existsSync(dataDir)) {
     await mkdir(dataDir, { recursive: true });
@@ -47,7 +44,7 @@ export async function initializeDatabase(): Promise<Database.Database> {
 export function getDatabase(): Database.Database {
   if (!db) {
     throw new Error(
-      "Database not initialized. Call initializeDatabase() first."
+      "Database not initialized. Call initializeDatabase() first.",
     );
   }
   return db;

@@ -1,5 +1,6 @@
 import type { Peer } from "crossws";
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 import type { JsonRpcMessage } from "#shared/types/jsonrpc";
 
 const MAX_SESSIONS = 5;
@@ -69,7 +70,15 @@ export default defineWebSocketHandler({
     try {
       // Use the persistent lean_project directory
       // process.cwd() is usually the project root (where package.json is)
-      const projectPath = join(process.cwd(), "lean_project");
+      let projectPath = join(process.cwd(), "lean_project");
+      if (!existsSync(projectPath)) {
+        // Try parent directory (e.g. when running from .output)
+        const parentPath = join(process.cwd(), "..", "lean_project");
+        if (existsSync(parentPath)) {
+          projectPath = parentPath;
+        }
+      }
+
       await server.start(projectPath);
       const session = sessions.get(peer.id);
       if (session) {
