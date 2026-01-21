@@ -47,7 +47,8 @@ export class LeanServerManager {
       type: "info",
     });
 
-    const leanPath = join(homedir(), ".elan", "bin", "lean");
+    const elanHome = process.env.ELAN_HOME || join(homedir(), ".elan");
+    const leanPath = join(elanHome, "bin", "lean");
 
     if (!existsSync(leanPath)) {
       this.notifyClient("$/serverStatus", {
@@ -62,19 +63,17 @@ export class LeanServerManager {
       type: "info",
     });
 
-    // Use lake serve instead of lean --server
-    const lakePath = join(homedir(), ".elan", "bin", "lake");
+    const lakePath = join(elanHome, "bin", "lake");
 
     console.log(`[LeanServer] Spawning lake from: ${lakePath}`);
     console.log(`[LeanServer] Workspace URI (cwd): ${workspaceUri}`);
 
     if (!existsSync(lakePath)) {
-      // Fallback to lean if lake is not found, but warn
       console.warn("Lake not found, falling back to lean --server");
       this.process = spawn(leanPath, ["--server"], {
         stdio: ["pipe", "pipe", "pipe"],
         env: process.env,
-        cwd: workspaceUri, // Use the workspaceUri as cwd
+        cwd: workspaceUri,
       });
     } else {
       this.process = spawn(lakePath, ["serve", "--"], {

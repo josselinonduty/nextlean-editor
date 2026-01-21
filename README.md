@@ -55,6 +55,21 @@ The easiest way to run NextLean is with Docker.
    docker compose exec app sh -c "cd lean_project && lake update && lake build"
    ```
 
+   > [!NOTE]
+   > You may encounter permission issues when running the above command.
+   >
+   > To run the command as yourself (not recommended), use:
+   >
+   > ```bash
+   > UID=$(id -u) GID=$(id -g) docker compose up -d
+   > ```
+   >
+   > For a quick and dirty fix, you can also run on host:
+   >
+   > ```bash
+   > chmod -R 777 lean_project
+   > ```
+
 5. **Open your browser**
 
    Navigate to [http://localhost:3000](http://localhost:3000)
